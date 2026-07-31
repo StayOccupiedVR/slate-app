@@ -1,0 +1,1099 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#0E1622" />
+<meta name="description" content="Daily MLB slate with pitching matchups, bullpen usage, and a log5 win probability model." />
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="apple-touch-icon" href="apple-touch-icon.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Slate" />
+<title>Slate · MLB Daily Board</title>
+<style>
+  :root {
+    --ink:#0E1622; --panel:#16212E; --panel-2:#1C2937; --line:#27384B;
+    --text:#DEE6ED; --dim:#7E92A8; --faint:#5B6F84;
+    --truth:#5FD0C4; --heat:#D98C3A; --good:#74CF98; --bad:#E8776C;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body { background:var(--ink); }
+  body {
+    margin:0; color:var(--text); font-family:var(--sans);
+    padding: max(18px, env(safe-area-inset-top)) 14px
+             calc(76px + env(safe-area-inset-bottom)) 14px;
+    -webkit-text-size-adjust:100%;
+  }
+  .wrap { max-width:680px; margin:0 auto; }
+  .hide { display:none !important; }
+
+  .eyebrow { font-family:var(--mono); font-size:10px; letter-spacing:.18em;
+    text-transform:uppercase; color:var(--dim); margin:0 0 6px; }
+  h1 { font-size:27px; font-weight:600; letter-spacing:-.025em; margin:0 0 3px; line-height:1.1; }
+  h1 em { font-style:normal; color:var(--truth); }
+  .sub { color:var(--dim); font-size:13px; margin:0; }
+  .lede { color:var(--dim); font-size:13.5px; line-height:1.5; margin:0 0 22px; max-width:52ch; }
+
+  button {
+    font-family:var(--sans); font-size:13px; font-weight:500;
+    background:var(--panel); color:var(--text); border:1px solid var(--line);
+    border-radius:7px; padding:9px 13px; cursor:pointer; transition:border-color .15s;
+  }
+  button:hover { border-color:var(--truth); }
+  button:focus-visible { outline:2px solid var(--truth); outline-offset:2px; }
+  button.ghost { color:var(--dim); }
+
+  /* bottom tab bar */
+  .tabs {
+    position:fixed; left:0; right:0; bottom:0; z-index:20;
+    display:flex; background:rgba(14,22,34,.94);
+    backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
+    border-top:1px solid var(--line);
+    padding-bottom:env(safe-area-inset-bottom);
+  }
+  .tabs button {
+    flex:1; border:none; background:none; border-radius:0;
+    padding:14px 6px; color:var(--faint); font-size:11px; font-weight:600;
+    letter-spacing:.1em; text-transform:uppercase; font-family:var(--mono);
+  }
+  .tabs button.on { color:var(--truth); box-shadow:inset 0 2px 0 var(--truth); }
+  .tabs button:hover { border:none; }
+
+  .nav { display:flex; gap:8px; align-items:center; margin:16px 0 12px; }
+  .spacer { flex:1; }
+  .today-chip { font-family:var(--mono); font-size:11px; color:var(--truth);
+    border:1px solid var(--truth); border-radius:20px; padding:4px 10px; }
+  #phase { font-family:var(--mono); font-size:10.5px; color:var(--faint);
+    letter-spacing:.08em; margin:0 0 16px; min-height:14px; }
+
+  /* ---- board ---- */
+  .game { background:var(--panel); border:1px solid var(--line);
+    border-radius:10px; margin-bottom:11px; overflow:hidden; }
+  .game-head { display:flex; justify-content:space-between; align-items:center;
+    padding:9px 14px; border-bottom:1px solid var(--line); background:var(--panel-2);
+    font-family:var(--mono); font-size:11px; letter-spacing:.06em; }
+  .venue { color:var(--dim); overflow:hidden; text-overflow:ellipsis;
+    white-space:nowrap; margin-left:10px; text-align:right; }
+  .dh { color:var(--heat); border:1px solid var(--heat); border-radius:4px;
+    padding:1px 5px; font-size:9px; margin-left:7px; }
+  .final { color:var(--dim); }
+
+  .side { display:grid; grid-template-columns:1fr auto; gap:10px;
+    padding:11px 14px; align-items:start; }
+  .side + .side { border-top:1px solid var(--line); }
+  .team-line { display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; }
+  .abbr { font-size:16px; font-weight:700; letter-spacing:-.01em; }
+  .rec { font-family:var(--mono); font-size:12px; color:var(--dim); }
+  .l10 { font-family:var(--mono); font-size:11px; color:var(--dim); }
+  .l10 b { color:var(--text); font-weight:600; }
+  .strk { font-family:var(--mono); font-size:10px; font-weight:700;
+    padding:1px 5px; border-radius:3px; }
+  .strk.w { color:var(--good); border:1px solid var(--good); }
+  .strk.l { color:var(--bad); border:1px solid var(--bad); }
+  .teammeta { font-family:var(--mono); font-size:10.5px; color:var(--faint);
+    margin-top:4px; display:flex; gap:9px; flex-wrap:wrap; }
+  .rd.pos { color:var(--good); }
+  .rd.neg { color:var(--bad); }
+  .pen.tired { color:var(--heat); }
+
+  .pitcher { margin-top:8px; font-size:13px;
+    border-left:2px solid var(--line); padding-left:9px; }
+  .nm { font-weight:500; }
+  .hand { color:var(--dim); font-size:11px; margin-left:4px; }
+  .pline { font-family:var(--mono); font-size:11px; color:var(--dim);
+    margin-top:2px; display:flex; gap:9px; flex-wrap:wrap; }
+  .era { color:var(--truth); font-weight:600; }
+  .l5, .split { font-family:var(--mono); font-size:10.5px; color:var(--faint); margin-top:2px; }
+  .l5 b, .split b { color:var(--dim); font-weight:600; }
+  .tbd { color:var(--dim); font-style:italic; font-size:13px; margin-top:8px; }
+  .score { font-family:var(--mono); font-size:21px; font-weight:700;
+    min-width:34px; text-align:right; }
+
+  .model { border-top:1px solid var(--line); background:var(--panel-2); padding:11px 14px; }
+  .model-top { display:flex; justify-content:space-between; align-items:baseline;
+    gap:10px; flex-wrap:wrap; }
+  .model-lab { font-family:var(--mono); font-size:9.5px; letter-spacing:.16em;
+    text-transform:uppercase; color:var(--faint); }
+  .model-nums { font-family:var(--mono); font-size:13px; font-weight:600; }
+  .model-nums .fav { color:var(--truth); }
+  .model-nums .sep { color:var(--faint); font-weight:400; margin:0 5px; }
+  .bar { display:flex; height:6px; border-radius:3px; overflow:hidden;
+    margin:9px 0 7px; background:var(--ink); }
+  .bar .a { background:var(--truth); }
+  .bar .b { background:#4E6274; }
+  .parts { font-family:var(--mono); font-size:10px; color:var(--faint);
+    display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+  .parts .up { color:var(--good); }
+  .parts .dn { color:var(--bad); }
+  .toev { font-family:var(--mono); font-size:9.5px; letter-spacing:.1em;
+    padding:4px 9px; border-radius:5px; margin-left:auto;
+    background:transparent; border:1px solid var(--line); color:var(--dim); }
+
+  .msg { border:1px solid var(--line); background:var(--panel); border-radius:10px;
+    padding:22px 18px; text-align:center; color:var(--dim); font-size:14px; line-height:1.55; }
+  .msg.err { border-color:var(--bad); }
+  .msg h3 { color:var(--text); font-size:15px; margin:0 0 8px; }
+  .msg button { margin-top:14px; }
+
+  /* ---- calculator ---- */
+  .card { background:var(--panel); border:1px solid var(--line);
+    border-radius:10px; padding:18px 16px; margin-bottom:14px; }
+  .card-label { font-family:var(--mono); font-size:10px; letter-spacing:.16em;
+    text-transform:uppercase; color:var(--dim); margin:0 0 14px; }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  @media (max-width:520px){ .grid2 { grid-template-columns:1fr; } }
+  .field { display:flex; flex-direction:column; gap:7px; }
+  .field label { font-family:var(--mono); font-size:10px; letter-spacing:.14em;
+    text-transform:uppercase; color:var(--dim); }
+  input[type=text] {
+    background:var(--ink); border:1px solid var(--line); border-radius:6px;
+    color:var(--text); font-family:var(--mono); font-size:15px; padding:10px 12px; width:100%;
+  }
+  input[type=text]:focus { outline:2px solid var(--truth); outline-offset:1px; border-color:var(--truth); }
+  input.odds { font-size:20px; }
+  input.bad-input { border-color:var(--bad); }
+  .hint { font-size:11px; color:var(--bad); font-family:var(--mono); min-height:14px; }
+
+  .barrow { margin-bottom:16px; }
+  .barhead { display:flex; justify-content:space-between; font-family:var(--mono);
+    font-size:10px; letter-spacing:.14em; text-transform:uppercase;
+    color:var(--dim); margin-bottom:7px; }
+  .track { position:relative; height:34px; background:var(--ink);
+    border:1px solid var(--line); border-radius:5px; overflow:hidden; display:flex; }
+  .seg { display:flex; align-items:center; justify-content:center;
+    font-family:var(--mono); font-size:12px; font-weight:600; color:var(--ink);
+    transition:width .4s cubic-bezier(.4,0,.2,1); white-space:nowrap; overflow:hidden; }
+  .seg-a { background:var(--truth); }
+  .seg-b { background:#4E6274; color:var(--text); }
+  .marker { position:absolute; top:-3px; bottom:-3px; width:2px;
+    background:var(--text); box-shadow:0 0 0 2px var(--panel); z-index:3; }
+  .mtag { position:absolute; transform:translateX(-50%); font-family:var(--mono);
+    font-size:9px; color:var(--dim); padding-top:4px; }
+
+  .readout { display:grid; grid-template-columns:repeat(3,1fr); gap:1px;
+    background:var(--line); border:1px solid var(--line); border-radius:8px;
+    overflow:hidden; margin-top:22px; }
+  @media (max-width:520px){ .readout { grid-template-columns:1fr; } }
+  .cell { background:var(--panel-2); padding:13px; }
+  .cell dt { font-family:var(--mono); font-size:9px; letter-spacing:.14em;
+    text-transform:uppercase; color:var(--dim); margin:0 0 6px; }
+  .cell dd { margin:0; font-family:var(--mono); font-size:19px; font-weight:600; }
+  .cell dd small { font-size:11px; font-weight:400; color:var(--dim); margin-left:5px; }
+  .v-truth { color:var(--truth); } .v-vig { color:var(--heat); }
+
+  .slider-val { font-family:var(--mono); font-size:26px; font-weight:600; color:var(--truth); }
+  .slider-val span { font-size:13px; color:var(--dim); font-weight:400; margin-left:6px; }
+  input[type=range] { width:100%; -webkit-appearance:none; appearance:none;
+    background:transparent; margin:8px 0 4px; }
+  input[type=range]::-webkit-slider-runnable-track { height:5px; background:var(--line); border-radius:3px; }
+  input[type=range]::-moz-range-track { height:5px; background:var(--line); border-radius:3px; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:24px; height:24px;
+    border-radius:50%; background:var(--truth); border:3px solid var(--panel); margin-top:-10px; }
+  input[type=range]::-moz-range-thumb { width:24px; height:24px; border-radius:50%;
+    background:var(--truth); border:3px solid var(--panel); }
+  .scale { display:flex; justify-content:space-between; font-family:var(--mono);
+    font-size:10px; color:var(--dim); }
+
+  .sides { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  @media (max-width:520px){ .sides { grid-template-columns:1fr; } }
+  .sidecard { border:1px solid var(--line); border-radius:8px; padding:14px; background:var(--panel-2); }
+  .sidecard.win { border-color:var(--good); }
+  .side-name { font-size:14px; font-weight:600; margin:0 0 2px; }
+  .side-ml { font-family:var(--mono); font-size:11px; color:var(--dim); margin-bottom:11px; }
+  .row { display:flex; justify-content:space-between; font-family:var(--mono);
+    font-size:12px; padding:5px 0; border-top:1px solid var(--line); }
+  .row:first-of-type { border-top:none; }
+  .row span:first-child { color:var(--dim); }
+  .row span:last-child { font-weight:600; }
+  .pos { color:var(--good); } .neg { color:var(--bad); }
+  .verdict { margin-top:14px; padding:14px; border-radius:8px; border:1px solid var(--line);
+    background:var(--panel); font-size:14px; line-height:1.55; }
+  .verdict.yes { border-color:var(--good); }
+  .verdict strong { color:var(--good); }
+  .verdict.no strong { color:var(--dim); }
+
+  .foot { margin-top:22px; padding-top:16px; border-top:1px solid var(--line);
+    font-size:11.5px; line-height:1.65; color:var(--dim); }
+  .foot b { color:var(--text); font-weight:600; }
+  .foot p { margin:0 0 9px; }
+  .key { font-family:var(--mono); font-size:10.5px; }
+  .warn { border-left:2px solid var(--heat); padding-left:10px; }
+</style>
+</head>
+<body>
+
+<!-- ===================== BOARD ===================== -->
+<div class="wrap" id="view-board">
+  <p class="eyebrow">Daily slate · live from MLB Stats API</p>
+  <h1 id="title">Loading…</h1>
+  <p class="sub" id="sub">Pulling the board…</p>
+
+  <div class="nav">
+    <button id="prev">← Prev</button>
+    <button id="next">Next →</button>
+    <span class="spacer"></span>
+    <span id="todayBtn"></span>
+  </div>
+  <p id="phase"></p>
+
+  <div id="board"></div>
+
+  <div class="foot">
+    <p class="key"><b>RD</b> run differential · <b>PYTH</b> expected record from runs
+      scored and allowed · <b>PEN L3</b> relief pitches over the last three days, plus
+      arms used on two or more of those days · <b>L5</b> the starter's last five starts ·
+      <b>Opp lineup</b> the other team's OPS against this pitcher's hand.</p>
+    <p><b>How the model works.</b> Pythagorean win percentage, regressed toward .500 and
+      combined with log5. Home field adds about four points. Starters are scored against
+      the league's actual ERA, blending season with last five starts and regressing small
+      samples toward the mean, then converted from runs into win probability. Platoon
+      splits contribute a smaller offensive term.</p>
+    <p class="warn"><b>What it isn't.</b> The model knows nothing about lineups, park
+      factors, defense, bullpen quality, weather, or injuries. When it disagrees sharply
+      with the market, assume the model is wrong — the market has more information than
+      four inputs. Treat it as a sanity check, not a signal.</p>
+  </div>
+</div>
+
+<!-- ===================== EV ===================== -->
+<div class="wrap hide" id="view-ev">
+  <p class="eyebrow">Moneyline · no-vig · expected value</p>
+  <h1>Find the <em>true</em> number under the book's price.</h1>
+  <p class="lede">Enter both sides of a moneyline. This strips the sportsbook's margin to
+    show the fair probability, then checks your estimate against it.</p>
+
+  <div class="card">
+    <p class="card-label">The two prices</p>
+    <div class="grid2">
+      <div class="field">
+        <label for="nameA">Side A</label>
+        <input type="text" id="nameA" value="Away" />
+        <input type="text" class="odds" id="mlA" value="-150" aria-label="Side A moneyline" />
+        <span class="hint" id="hintA"></span>
+      </div>
+      <div class="field">
+        <label for="nameB">Side B</label>
+        <input type="text" id="nameB" value="Home" />
+        <input type="text" class="odds" id="mlB" value="+130" aria-label="Side B moneyline" />
+        <span class="hint" id="hintB"></span>
+      </div>
+    </div>
+  </div>
+
+  <div id="evBody"></div>
+
+  <div class="foot">
+    <p><b>Edge</b> is your probability minus the fair probability. <b>EV</b> is the average
+      return per $100 if you repeated the bet forever. <b>Kelly</b> is the bankroll share
+      that maximizes long-run growth — most people size at half Kelly or less, because full
+      Kelly assumes your estimate is exactly right and swings hard when it isn't.</p>
+    <p>This tool doesn't find edges. It checks the arithmetic on an estimate you supply.
+      If that estimate is a hunch, the output is a hunch with decimal places.</p>
+  </div>
+</div>
+
+
+<!-- ===================== BACKTEST ===================== -->
+<div class="wrap hide" id="view-bt">
+  <p class="eyebrow">Backtest · point-in-time · calibration</p>
+  <h1>Did the model <em>actually</em> know anything?</h1>
+  <p class="lede">Replays past games using only what was knowable that morning, then scores the
+    predictions. Weights re-fit instantly once the data is loaded.</p>
+
+  <div class="card">
+    <p class="card-label">Window</p>
+    <div class="grid2">
+      <div class="field"><label for="btStart">Start</label>
+        <input type="text" id="btStart" placeholder="YYYY-MM-DD" /></div>
+      <div class="field"><label for="btEnd">End</label>
+        <input type="text" id="btEnd" placeholder="YYYY-MM-DD" /></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
+      <button id="btRun">Run backtest</button>
+      <button class="ghost" id="btFit">Fit weights</button>
+    </div>
+    <p id="btPhase" style="font-family:var(--mono);font-size:10.5px;color:var(--faint);
+       letter-spacing:.08em;margin:12px 0 0;min-height:14px"></p>
+  </div>
+
+  <div id="btOut"></div>
+
+  <div class="foot">
+    <p><b>Brier score</b> is the mean squared error of the probabilities. Lower is better;
+      always guessing 50% scores .2500. <b>Skill</b> is how much better than that guess the
+      model does, as a percentage. <b>Log loss</b> punishes confident mistakes harder.
+      <b>Calibration</b> is the one that matters most: when the model says 60%, does that
+      group actually win about 60% of the time?</p>
+    <p class="warn"><b>Fitting overfits.</b> The fit button splits the window chronologically,
+      tunes on the earlier 70%, and reports on the held-out 30%. Trust the test column, not the
+      train column. With fewer than a few hundred games, even that is thin — a fitted weight
+      that improves test log loss by a hair is probably noise.</p>
+    <p><b>What's excluded.</b> The platoon term is dropped here because team splits can't be
+      reconstructed as of a past date from this API. The backtest scores team strength, home
+      field, and starters only. League ERA is approximated from runs per game to date, which
+      shifts both sides almost equally and largely cancels.</p>
+  </div>
+</div>
+
+<nav class="tabs">
+  <button id="tab-board" class="on">Board</button>
+  <button id="tab-ev">EV Calc</button>
+  <button id="tab-bt">Backtest</button>
+</nav>
+
+<script>
+const API = "https://statsapi.mlb.com/api/v1";
+/* Optional: URL of nightly ML predictions (predictions.json from slate-lab).
+   Example: "https://<user>.github.io/<repo>/predictions.json". Empty = off. */
+const ML_URL = "https://StayOccupiedVR.github.io/slate-lab/predictions.json";
+let MLP = {};  // gamePk -> pAway
+
+/* ---------- shared helpers ---------- */
+const etToday = () => new Intl.DateTimeFormat("en-CA",
+  { timeZone:"America/New_York", year:"numeric", month:"2-digit", day:"2-digit" }).format(new Date());
+const shift = (iso,n) => { const [y,m,d]=iso.split("-").map(Number);
+  const dt=new Date(Date.UTC(y,m-1,d)); dt.setUTCDate(dt.getUTCDate()+n);
+  return dt.toISOString().slice(0,10); };
+const pretty = iso => { const [y,m,d]=iso.split("-").map(Number);
+  return new Date(Date.UTC(y,m-1,d)).toLocaleDateString("en-US",
+    { timeZone:"UTC", weekday:"short", month:"short", day:"numeric" }); };
+const clock = utc => new Date(utc).toLocaleTimeString("en-US",
+  { timeZone:"America/New_York", hour:"numeric", minute:"2-digit" });
+const esc = s => String(s ?? "").replace(/[&<>"]/g,
+  c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]));
+const ipToOuts = ip => { const [w,f]=String(ip ?? "0").split(".");
+  return (parseInt(w,10)||0)*3 + (f ? parseInt(f,10)||0 : 0); };
+const outsToIp = o => Math.floor(o/3)+"."+(o%3);
+const logit = p => Math.log(p/(1-p));
+const ilogit = z => 1/(1+Math.exp(-z));
+const clamp = (x,lo,hi) => Math.max(lo,Math.min(hi,x));
+const pct = (x,d=1) => (x*100).toFixed(d)+"%";
+const probToML = p => { if (p<=0||p>=1) return "—";
+  const n = p>=0.5 ? -Math.round((p/(1-p))*100) : Math.round(((1-p)/p)*100);
+  return n>0 ? "+"+n : ""+n; };
+const jget = async url => { const r = await fetch(url);
+  if (!r.ok) throw new Error("Request failed ("+r.status+")"); return r.json(); };
+async function pool(items, limit, fn) {
+  const out = new Array(items.length); let i = 0;
+  await Promise.all(Array.from({length:Math.min(limit,items.length)}, async () => {
+    while (i < items.length) { const idx = i++;
+      try { out[idx] = await fn(items[idx]); } catch { out[idx] = null; } }
+  }));
+  return out;
+}
+
+/* ---------- tabs ---------- */
+const VIEWS = ["board","ev","bt"];
+function show(which) {
+  VIEWS.forEach(v => {
+    document.getElementById("view-"+v).classList.toggle("hide", which !== v);
+    document.getElementById("tab-"+v).classList.toggle("on", which === v);
+  });
+  window.scrollTo(0,0);
+}
+VIEWS.forEach(v => { document.getElementById("tab-"+v).onclick = () => show(v); });
+
+/* ================= BOARD ================= */
+const M = {
+  TEAM_REGRESS:0.85, HFA_LOGIT:0.155, SP_PRIOR_IP:50, SP_L5_WEIGHT:0.25,
+  IP_PER_START:5.4, RUNS_TO_LOGIT:0.34, OPS_TO_RUNS:8.0,
+  PROB_FLOOR:0.15, PROB_CEIL:0.85
+};
+let date = etToday();
+let S = { games:[], team:{}, pitch:{}, splits:{}, pen:{}, lgEra:null, lgOps:{} };
+const setPhase = t => { document.getElementById("phase").textContent = t || ""; };
+
+function log5(pa,pb){ const den = pa+pb-2*pa*pb; return den===0 ? 0.5 : (pa-pa*pb)/den; }
+
+function starterEdge(ps) {
+  const lg = S.lgEra; if (!lg) return null;
+  if (!ps || ps.era == null) return { saved:0, unknown:true };
+  const ip = ipToOuts(ps.ip)/3;
+  const se = Number(ps.era); if (!Number.isFinite(se)) return { saved:0, unknown:true };
+  const l5 = ps.l5 ? Number(ps.l5.era) : null;
+  const blended = (l5!=null && Number.isFinite(l5))
+    ? se*(1-M.SP_L5_WEIGHT) + l5*M.SP_L5_WEIGHT : se;
+  const adj = (blended*ip + lg*M.SP_PRIOR_IP) / (ip + M.SP_PRIOR_IP);
+  return { saved: (lg-adj)*(M.IP_PER_START/9) };
+}
+function offenseEdge(teamId, oppHand) {
+  if (!oppHand || !S.splits[teamId] || !S.lgOps[oppHand]) return 0;
+  const ops = Number(S.splits[teamId][oppHand]?.ops);
+  return Number.isFinite(ops) ? (ops - S.lgOps[oppHand]) * M.OPS_TO_RUNS : 0;
+}
+function modelGame(g) {
+  const a=g.teams?.away, h=g.teams?.home;
+  const aId=a?.team?.id, hId=h?.team?.id;
+  const ta=S.team[aId], tb=S.team[hId];
+  if (!ta || !tb || ta.pythPct==null || tb.pythPct==null) return null;
+  const pa = 0.5 + (ta.pythPct-0.5)*M.TEAM_REGRESS;
+  const pb = 0.5 + (tb.pythPct-0.5)*M.TEAM_REGRESS;
+  const base = log5(pa,pb);
+  let z = logit(clamp(base,0.05,0.95)) - M.HFA_LOGIT;
+  const spA = starterEdge(S.pitch[a?.probablePitcher?.id]);
+  const spB = starterEdge(S.pitch[h?.probablePitcher?.id]);
+  const spRuns = (spA && spB) ? spA.saved - spB.saved : 0;
+  z += spRuns * M.RUNS_TO_LOGIT;
+  const offRuns = offenseEdge(aId, S.pitch[h?.probablePitcher?.id]?.hand)
+                - offenseEdge(hId, S.pitch[a?.probablePitcher?.id]?.hand);
+  z += offRuns * M.RUNS_TO_LOGIT;
+  const p = clamp(ilogit(z), M.PROB_FLOOR, M.PROB_CEIL);
+  return { pAway:p, pHome:1-p, base, spRuns, offRuns,
+           partial: !(spA && spB) || spA?.unknown || spB?.unknown };
+}
+
+function render() {
+  const board = document.getElementById("board");
+  if (!S.games.length) {
+    board.innerHTML = '<div class="msg"><h3>No games scheduled</h3>Nothing on the calendar for this date.</div>';
+    return;
+  }
+  board.innerHTML = S.games.map(g => {
+    const live = g.status?.abstractGameState !== "Preview";
+    const head = '<div class="game-head"><span>'
+      + (live ? '<span class="final">'+esc(g.status?.detailedState)+'</span>' : esc(clock(g.gameDate)))
+      + (g.doubleHeader!=="N" ? '<span class="dh">DH · GM '+g.gameNumber+'</span>' : '')
+      + '</span><span class="venue">'+esc(g.venue?.name)+'</span></div>';
+
+    const sides = ["away","home"].map(k => {
+      const other = k==="away" ? "home" : "away";
+      const t=g.teams?.[k], id=t?.team?.id, i=S.team[id]||{};
+      const pp=t?.probablePitcher, ps=pp?S.pitch[pp.id]:null, pen=S.pen[id];
+      const oppId=g.teams?.[other]?.team?.id, hand=ps?.hand;
+      const oppSplit = (hand && S.splits[oppId]) ? S.splits[oppId][hand] : null;
+
+      const meta=[];
+      if (i.rd!=null) meta.push('<span class="rd '+(i.rd>=0?"pos":"neg")+'">'+(i.rd>=0?"+":"")+i.rd+' RD</span>');
+      if (i.pyth) meta.push('<span>PYTH '+esc(i.pyth)+'</span>');
+      if (pen) meta.push('<span class="pen'+(pen.tired>=3?" tired":"")+'">PEN L3 '+pen.pitches+'P'
+        +(pen.tired?' · '+pen.tired+' arms 2+d':'')+'</span>');
+
+      let ph = '<div class="tbd">Starter TBD</div>';
+      if (pp) {
+        ph = '<div class="pitcher"><span class="nm">'+esc(pp.fullName)+'</span>'
+          + (ps?.hand ? '<span class="hand">'+esc(ps.hand)+'HP</span>' : '')
+          + (ps && ps.era!=null ? '<div class="pline"><span class="era">'+esc(ps.era)+' ERA</span>'
+              + '<span>'+esc(ps.w)+'-'+esc(ps.l)+'</span><span>'+esc(ps.ip)+' IP</span>'
+              + '<span>'+esc(ps.so)+' K</span>'
+              + (ps.whip?'<span>'+esc(ps.whip)+' WHIP</span>':'')+'</div>' : '')
+          + (ps && ps.l5 ? '<div class="l5">Last '+ps.l5.n+' starts · <b>'+ps.l5.era+' ERA</b> · '+ps.l5.ip+' IP</div>' : '')
+          + (oppSplit && oppSplit.ops ? '<div class="split">Opp lineup vs '+esc(hand)+'HP · <b>'+esc(oppSplit.ops)+' OPS</b></div>' : '')
+          + '</div>';
+      }
+      return '<div class="side"><div><div class="team-line">'
+        + '<span class="abbr">'+esc(t?.team?.abbreviation)+'</span>'
+        + '<span class="rec">'+(i.w!=null?i.w+"-"+i.l:"—")+'</span>'
+        + (i.l10?'<span class="l10">L10 <b>'+esc(i.l10)+'</b></span>':'')
+        + (i.strk?'<span class="strk '+(i.strk[0]==="W"?"w":"l")+'">'+esc(i.strk)+'</span>':'')
+        + '</div>'
+        + (meta.length?'<div class="teammeta">'+meta.join("")+'</div>':'')
+        + ph + '</div><div class="score">'+(live && t?.score!=null ? t.score : "")+'</div></div>';
+    }).join("");
+
+    let mh = "";
+    const m = modelGame(g);
+    if (m) {
+      const aAb=esc(g.teams?.away?.team?.abbreviation), hAb=esc(g.teams?.home?.team?.abbreviation);
+      const aP=(m.pAway*100).toFixed(1), hP=(m.pHome*100).toFixed(1);
+      const awayFav = m.pAway >= m.pHome;
+      const sg = v => (v>=0?"+":"−")+Math.abs(v).toFixed(2);
+      mh = '<div class="model"><div class="model-top">'
+        + '<span class="model-lab">Model'+(m.partial?' · partial':'')+'</span>'
+        + '<span class="model-nums"><span class="'+(awayFav?"fav":"")+'">'+aAb+' '+aP+'% ('+probToML(m.pAway)+')</span>'
+        + '<span class="sep">vs</span><span class="'+(!awayFav?"fav":"")+'">'+hAb+' '+hP+'% ('+probToML(m.pHome)+')</span></span></div>'
+        + '<div class="bar"><div class="a" style="width:'+aP+'%"></div><div class="b" style="width:'+hP+'%"></div></div>'
+        + '<div class="parts"><span>base '+(m.base*100).toFixed(1)+'% '+aAb+'</span>'
+        + '<span>home field −3.9pt</span>'
+        + '<span class="'+(m.spRuns>=0?"up":"dn")+'">starters '+sg(m.spRuns)+' R</span>'
+        + '<span class="'+(m.offRuns>=0?"up":"dn")+'">bats '+sg(m.offRuns)+' R</span>'
+        + (MLP[g.gamePk]!=null ? '<span style="color:var(--heat)">ML '+(MLP[g.gamePk]*100).toFixed(1)+'% '+aAb+'</span>' : '') + '<button class="toev" data-a="'+aAb+'" data-h="'+hAb+'" data-p="'+aP+'">→ EV</button>'
+        + '</div></div>';
+    }
+    return '<div class="game">'+head+sides+mh+'</div>';
+  }).join("");
+
+  board.querySelectorAll(".toev").forEach(btn => {
+    btn.onclick = () => {
+      document.getElementById("nameA").value = btn.dataset.a;
+      document.getElementById("nameB").value = btn.dataset.h;
+      document.getElementById("estA").value = Math.round(Number(btn.dataset.p));
+      show("ev"); drawEV();
+    };
+  });
+}
+
+async function loadCore() {
+  const season = date.slice(0,4);
+  const [sched, stand] = await Promise.all([
+    jget(API+"/schedule?sportId=1&date="+date+"&hydrate=team,probablePitcher,linescore"),
+    jget(API+"/standings?leagueId=103,104&season="+season+"&standingsTypes=regularSeason")
+  ]);
+  const team = {};
+  (stand.records||[]).forEach(div => (div.teamRecords||[]).forEach(tr => {
+    const l10 = (tr.records?.splitRecords||[]).find(s => s.type==="lastTen");
+    const rs=Number(tr.runsScored), ra=Number(tr.runsAllowed);
+    let pyth=null, pythPct=null;
+    if (rs>0 && ra>0) {
+      const gp=tr.wins+tr.losses;
+      pythPct = Math.pow(rs,1.83)/(Math.pow(rs,1.83)+Math.pow(ra,1.83));
+      const ew = Math.round(pythPct*gp); pyth = ew+"-"+(gp-ew);
+    }
+    team[tr.team.id] = { w:tr.wins, l:tr.losses,
+      l10: l10 ? l10.wins+"-"+l10.losses : null,
+      strk: tr.streak?.streakCode || null,
+      rd: Number.isFinite(Number(tr.runDifferential)) ? Number(tr.runDifferential) : null,
+      pyth, pythPct };
+  }));
+  S.team = team;
+  S.games = (sched.dates||[]).flatMap(d=>d.games||[])
+    .sort((a,b)=>new Date(a.gameDate)-new Date(b.gameDate));
+  document.getElementById("sub").textContent =
+    S.games.length+" game"+(S.games.length===1?"":"s")+" · times Eastern";
+  render();
+}
+
+async function loadPitchers() {
+  const season = date.slice(0,4);
+  const ids = [...new Set(S.games.flatMap(g =>
+    ["away","home"].map(s=>g.teams?.[s]?.probablePitcher?.id).filter(Boolean)))];
+  if (!ids.length) return;
+  const j = await jget(API+"/people?personIds="+ids.join(",")
+    +"&hydrate=stats(group=[pitching],type=[season,gameLog],season="+season+")");
+  const map = {};
+  (j.people||[]).forEach(p => {
+    const sb=(p.stats||[]).find(b=>b.type?.displayName==="season");
+    const lb=(p.stats||[]).find(b=>b.type?.displayName==="gameLog");
+    const st=sb?.splits?.[0]?.stat;
+    let l5=null;
+    if (lb?.splits?.length) {
+      const starts = lb.splits.filter(s=>Number(s.stat?.gamesStarted)===1)
+        .sort((a,b)=>new Date(a.date)-new Date(b.date)).slice(-5);
+      if (starts.length) {
+        let er=0, outs=0;
+        starts.forEach(s => { er += Number(s.stat.earnedRuns)||0;
+                              outs += ipToOuts(s.stat.inningsPitched); });
+        if (outs>0) l5 = { era:((er*27)/outs).toFixed(2), ip:outsToIp(outs), n:starts.length };
+      }
+    }
+    map[p.id] = { hand:p.pitchHand?.code||"", era:st?.era, w:st?.wins, l:st?.losses,
+                  ip:st?.inningsPitched, so:st?.strikeOuts, whip:st?.whip, l5 };
+  });
+  S.pitch = map; render();
+}
+
+async function loadSplits() {
+  const season = date.slice(0,4);
+  const [sj, pj] = await Promise.all([
+    jget(API+"/teams/stats?season="+season+"&sportIds=1&group=hitting&stats=statSplits&sitCodes=vl,vr"),
+    jget(API+"/teams/stats?season="+season+"&sportIds=1&group=pitching&stats=season")
+  ]);
+  const out={}, acc={L:[],R:[]};
+  (sj.stats||[]).forEach(b => (b.splits||[]).forEach(sp => {
+    const tid=sp.team?.id, code=sp.split?.code;
+    const hand = code==="vl" ? "L" : code==="vr" ? "R" : null;
+    if (!tid || !hand) return;
+    out[tid]=out[tid]||{}; out[tid][hand]={ ops:sp.stat?.ops, avg:sp.stat?.avg };
+    const v=Number(sp.stat?.ops); if (Number.isFinite(v)) acc[hand].push(v);
+  }));
+  S.splits = out;
+  S.lgOps = { L: acc.L.length ? acc.L.reduce((a,b)=>a+b,0)/acc.L.length : null,
+              R: acc.R.length ? acc.R.reduce((a,b)=>a+b,0)/acc.R.length : null };
+  let er=0, outs=0;
+  (pj.stats||[]).forEach(b => (b.splits||[]).forEach(sp => {
+    er += Number(sp.stat?.earnedRuns)||0; outs += ipToOuts(sp.stat?.inningsPitched);
+  }));
+  if (outs>0) S.lgEra = (er*27)/outs;
+  render();
+}
+
+async function loadBullpen() {
+  const start=shift(date,-3), end=shift(date,-1);
+  const sched = await jget(API+"/schedule?sportId=1&startDate="+start+"&endDate="+end+"&hydrate=team");
+  const todayTeams = new Set(S.games.flatMap(g=>["away","home"].map(s=>g.teams?.[s]?.team?.id)));
+  const relevant = (sched.dates||[]).flatMap(d => (d.games||[])
+    .filter(g => g.status?.abstractGameState==="Final")
+    .filter(g => todayTeams.has(g.teams?.away?.team?.id) || todayTeams.has(g.teams?.home?.team?.id))
+    .map(g => ({ pk:g.gamePk, day:d.date })));
+  if (!relevant.length) return;
+  const boxes = await pool(relevant, 6, async ref => ({
+    box: await jget(API+"/game/"+ref.pk+"/boxscore"), day: ref.day }));
+  const usage={};
+  boxes.filter(Boolean).forEach(e => ["away","home"].forEach(side => {
+    const tm=e.box.teams?.[side], tid=tm?.team?.id;
+    if (!tid || !todayTeams.has(tid)) return;
+    usage[tid]=usage[tid]||{ pitches:0, arms:{} };
+    (tm.pitchers||[]).slice(1).forEach(pid => {
+      const pl=tm.players?.["ID"+pid];
+      usage[tid].pitches += Number(pl?.stats?.pitching?.numberOfPitches
+                                ?? pl?.stats?.pitching?.pitchesThrown ?? 0);
+      usage[tid].arms[pid]=usage[tid].arms[pid]||new Set();
+      usage[tid].arms[pid].add(e.day);
+    });
+  }));
+  const pen={};
+  Object.keys(usage).forEach(tid => { const u=usage[tid];
+    pen[tid]={ pitches:u.pitches, tired:Object.values(u.arms).filter(d=>d.size>=2).length }; });
+  S.pen = pen; render();
+}
+
+async function load() {
+  S = { games:[], team:{}, pitch:{}, splits:{}, pen:{}, lgEra:null, lgOps:{} };
+  document.getElementById("title").textContent = pretty(date);
+  document.getElementById("sub").textContent = "Pulling the board…";
+  document.getElementById("board").innerHTML = '<div class="msg">Loading schedule and standings…</div>';
+  const tb = document.getElementById("todayBtn");
+  tb.innerHTML = date===etToday() ? '<span class="today-chip">TODAY</span>'
+    : '<button class="ghost" id="goToday">Today</button>';
+  const gt = document.getElementById("goToday");
+  if (gt) gt.onclick = () => { date = etToday(); load(); };
+  try { setPhase("LOADING SCHEDULE + STANDINGS"); await loadCore(); }
+  catch (e) {
+    document.getElementById("board").innerHTML =
+      '<div class="msg err"><h3>Couldn\'t load the slate</h3>'+esc(e.message)
+      +'<br><button onclick="load()">Try again</button></div>';
+    setPhase(""); return;
+  }
+  if (ML_URL) {
+    try {
+      const mj = await (await fetch(ML_URL, {cache:"no-store"})).json();
+      MLP = {};
+      (mj.games||[]).forEach(g => { MLP[g.gamePk] = g.pAway; });
+    } catch (_) { MLP = {}; }
+  }
+  setPhase("ADDING STARTER LINES…");            await loadPitchers().catch(()=>{});
+  setPhase("ADDING SPLITS + LEAGUE BASELINES…"); await loadSplits().catch(()=>{});
+  setPhase("ADDING BULLPEN USAGE…");             await loadBullpen().catch(()=>{});
+  setPhase("");
+}
+document.getElementById("prev").onclick = () => { date=shift(date,-1); load(); };
+document.getElementById("next").onclick = () => { date=shift(date, 1); load(); };
+
+/* ================= EV CALCULATOR ================= */
+const validML = n => Number.isFinite(n) && (n>=100 || n<=-100);
+const mlProb  = ml => ml>0 ? 100/(ml+100) : Math.abs(ml)/(Math.abs(ml)+100);
+const mlDec   = ml => ml>0 ? 1+ml/100 : 1+100/Math.abs(ml);
+
+function drawEV() {
+  const mlA = parseInt(document.getElementById("mlA").value,10);
+  const mlB = parseInt(document.getElementById("mlB").value,10);
+  const okA = validML(mlA), okB = validML(mlB);
+  document.getElementById("hintA").textContent =
+    document.getElementById("mlA").value && !okA ? "Use −100 or lower, +100 or higher" : "";
+  document.getElementById("hintB").textContent =
+    document.getElementById("mlB").value && !okB ? "Use −100 or lower, +100 or higher" : "";
+  document.getElementById("mlA").classList.toggle("bad-input", !!document.getElementById("mlA").value && !okA);
+  document.getElementById("mlB").classList.toggle("bad-input", !!document.getElementById("mlB").value && !okB);
+
+  const body = document.getElementById("evBody");
+  const nameA = document.getElementById("nameA").value || "Side A";
+  const nameB = document.getElementById("nameB").value || "Side B";
+
+  if (!(okA && okB)) {
+    body.innerHTML = '<div class="card"><p class="msg">Enter two valid moneylines to see the breakdown.</p></div>';
+    return;
+  }
+
+  const rA=mlProb(mlA), rB=mlProb(mlB), over=rA+rB, vig=over-1;
+  const fA=rA/over, fB=rB/over, decA=mlDec(mlA), decB=mlDec(mlB);
+
+  const prev = document.getElementById("estA");
+  const estA = prev ? Number(prev.value) : 60;
+  const pA = clamp(estA/100, 0.01, 0.99), pB = 1-pA;
+  const calc = (p,dec,fair) => { const b=dec-1, ev=p*b-(1-p);
+    return { edge:p-fair, ev, ev100:ev*100, kelly:Math.max(b>0?(p*b-(1-p))/b:0,0) }; };
+  const A = calc(pA,decA,fA), B = calc(pB,decB,fB);
+  const best = A.ev>=B.ev ? {k:"A",n:nameA,p:pA,fair:fA,...A} : {k:"B",n:nameB,p:pB,fair:fB,...B};
+  const hasEdge = best.ev>0;
+
+  body.innerHTML =
+    '<div class="card"><p class="card-label">Where the margin hides</p>'
+    + '<div class="barrow"><div class="barhead"><span>As posted</span>'
+    + '<span style="color:var(--heat)">'+pct(over)+' total</span></div>'
+    + '<div class="track"><div class="seg seg-a" style="width:'+(rA/over*100)+'%">'+pct(rA)+'</div>'
+    + '<div class="seg seg-b" style="width:'+(rB/over*100)+'%">'+pct(rB)+'</div>'
+    + '<div class="marker" style="left:'+(1/over*100)+'%"></div></div>'
+    + '<div style="position:relative;height:16px"><span class="mtag" style="left:'+(1/over*100)+'%">100%</span></div>'
+    + '<p style="font-size:12px;color:var(--dim);margin:6px 0 0;line-height:1.5">'
+    + 'The two prices imply '+pct(over)+' of probability. Everything past the line is the book\'s cut.</p></div>'
+    + '<div class="barrow" style="margin-bottom:0"><div class="barhead"><span>Vig removed</span>'
+    + '<span style="color:var(--truth)">100.0% fair</span></div>'
+    + '<div class="track"><div class="seg seg-a" style="width:'+(fA*100)+'%">'+pct(fA)+'</div>'
+    + '<div class="seg seg-b" style="width:'+(fB*100)+'%">'+pct(fB)+'</div></div></div>'
+    + '<dl class="readout">'
+    + '<div class="cell"><dt>Book\'s margin</dt><dd class="v-vig">'+pct(vig,2)+'</dd></div>'
+    + '<div class="cell"><dt>Fair · '+esc(nameA)+'</dt><dd class="v-truth">'+probToML(fA)+'<small>was '+(mlA>0?"+":"")+mlA+'</small></dd></div>'
+    + '<div class="cell"><dt>Fair · '+esc(nameB)+'</dt><dd class="v-truth">'+probToML(fB)+'<small>was '+(mlB>0?"+":"")+mlB+'</small></dd></div>'
+    + '</dl></div>'
+
+    + '<div class="card"><p class="card-label">Your estimate</p>'
+    + '<div style="font-size:13px;color:var(--dim);margin-bottom:4px">Chance '+esc(nameA)+' wins</div>'
+    + '<div class="slider-val">'+estA.toFixed(0)+'%<span>· '+esc(nameB)+' '+(100-estA).toFixed(0)+'%</span></div>'
+    + '<input type="range" id="estA" min="1" max="99" step="1" value="'+estA+'" />'
+    + '<div class="scale"><span>1%</span><span>50%</span><span>99%</span></div>'
+    + '<p style="font-size:12px;color:var(--dim);margin:12px 0 0;line-height:1.5">'
+    + 'Break-even sits at '+pct(fA)+' for '+esc(nameA)+'. Above that is where a bet starts to pay.</p></div>'
+
+    + '<div class="card"><p class="card-label">What a $100 bet is worth</p><div class="sides">'
+    + [[ "A",nameA,mlA,A ],[ "B",nameB,mlB,B ]].map(([k,n,ml,d]) =>
+        '<div class="sidecard'+(hasEdge && best.k===k ? " win" : "")+'">'
+        + '<p class="side-name">'+esc(n)+'</p><p class="side-ml">'+(ml>0?"+":"")+ml+'</p>'
+        + '<div class="row"><span>Edge</span><span class="'+(d.edge>0?"pos":"neg")+'">'
+          + (d.edge>0?"+":"")+pct(d.edge,2)+'</span></div>'
+        + '<div class="row"><span>EV / $100</span><span class="'+(d.ev100>0?"pos":"neg")+'">'
+          + (d.ev100>0?"+":"−")+"$"+Math.abs(d.ev100).toFixed(2)+'</span></div>'
+        + '<div class="row"><span>Kelly</span><span>'+(d.kelly>0?(d.kelly*100).toFixed(1)+"%":"—")+'</span></div>'
+        + '<div class="row"><span>Half Kelly</span><span>'+(d.kelly>0?(d.kelly*50).toFixed(1)+"%":"—")+'</span></div>'
+        + '</div>').join("")
+    + '</div>'
+    + '<div class="verdict '+(hasEdge?"yes":"no")+'">'
+    + (hasEdge
+        ? '<strong>'+esc(best.n)+' clears the number.</strong> Your '+pct(best.p,0)
+          +' estimate beats the fair break-even of '+pct(best.fair)+', worth <strong>$'
+          +best.ev100.toFixed(2)+'</strong> per $100 — but only if your estimate is right.'
+        : '<strong>Neither side clears.</strong> Your estimate lands inside the book\'s fair '
+          +'range, so both bets lose money over time. This is the normal result. Pass.')
+    + '</div></div>';
+
+  const slider = document.getElementById("estA");
+  slider.oninput = drawEV;
+}
+["nameA","nameB","mlA","mlB"].forEach(id =>
+  document.getElementById(id).addEventListener("input", drawEV));
+
+/* ---------- boot ---------- */
+drawEV();
+load();
+
+
+/* ================= BACKTEST =================
+   Every input is reconstructed from games that finished BEFORE the game being
+   predicted. Nothing here can see the future. */
+
+let BT = { rows: [], loaded:false, weights:null };
+const btPhase = t => { document.getElementById("btPhase").textContent = t || ""; };
+
+const seasonOf = iso => iso.slice(0,4);
+
+/* --- season-long ledger: team W/L and runs, day by day --- */
+async function buildLedger(season) {
+  const j = await jget(API+"/schedule?sportId=1&startDate="+season+"-01-01"
+    +"&endDate="+season+"-12-31&gameType=R");
+  const games = (j.dates||[]).flatMap(d => (d.games||[])
+    .filter(g => g.status?.abstractGameState === "Final")
+    .map(g => ({
+      date: d.date,
+      a: g.teams?.away?.team?.id, h: g.teams?.home?.team?.id,
+      as: Number(g.teams?.away?.score), hs: Number(g.teams?.home?.score)
+    }))
+    .filter(g => g.a && g.h && Number.isFinite(g.as) && Number.isFinite(g.hs)));
+  games.sort((x,y) => x.date < y.date ? -1 : 1);
+  return games;
+}
+
+/* state of the league as of the morning of `date` */
+function ledgerAsOf(games, date) {
+  const t = {};
+  let runs = 0, teamGames = 0;
+  for (const g of games) {
+    if (g.date >= date) break;
+    for (const [id, rs, ra] of [[g.a,g.as,g.hs],[g.h,g.hs,g.as]]) {
+      t[id] = t[id] || { w:0, l:0, rs:0, ra:0 };
+      t[id].rs += rs; t[id].ra += ra;
+      if (rs > ra) t[id].w++; else t[id].l++;
+      teamGames++; runs += rs;
+    }
+  }
+  const rpg = teamGames ? runs/teamGames : 4.4;
+  return { teams: t, lgEra: rpg * 0.92 };   // earned runs are ~92% of all runs
+}
+
+const pythOf = r => (r && r.rs > 0 && r.ra > 0)
+  ? Math.pow(r.rs,1.83)/(Math.pow(r.rs,1.83)+Math.pow(r.ra,1.83)) : null;
+
+/* --- a starter's line as of a date, from his own game log --- */
+function pitcherAsOf(log, date) {
+  if (!log) return null;
+  let er=0, outs=0;
+  const before = log.filter(s => s.date < date);
+  if (!before.length) return null;
+  before.forEach(s => { er += s.er; outs += s.outs; });
+  if (outs < 9) return null;
+  const last5 = before.slice(-5);
+  let er5=0, outs5=0;
+  last5.forEach(s => { er5 += s.er; outs5 += s.outs; });
+  return {
+    era: (er*27)/outs,
+    ip: outs/3,
+    l5era: outs5 > 0 ? (er5*27)/outs5 : null
+  };
+}
+
+/* --- the model, as a pure function of inputs and weights --- */
+function scoreRow(r, w) {
+  const pa = 0.5 + (r.pythA - 0.5)*w.TEAM_REGRESS;
+  const pb = 0.5 + (r.pythB - 0.5)*w.TEAM_REGRESS;
+  const base = log5(pa, pb);
+  let z = logit(clamp(base, 0.05, 0.95)) - w.HFA_LOGIT;
+
+  const arm = p => {
+    if (!p) return 0;
+    const blend = (p.l5era != null)
+      ? p.era*(1-w.SP_L5_WEIGHT) + p.l5era*w.SP_L5_WEIGHT : p.era;
+    const adj = (blend*p.ip + r.lgEra*w.SP_PRIOR_IP) / (p.ip + w.SP_PRIOR_IP);
+    return (r.lgEra - adj) * (w.IP_PER_START/9);
+  };
+  z += (arm(r.spA) - arm(r.spB)) * w.RUNS_TO_LOGIT;
+  return clamp(ilogit(z), w.PROB_FLOOR, w.PROB_CEIL);
+}
+
+/* --- metrics --- */
+function evaluate(rows, w) {
+  if (!rows.length) return null;
+  let brier=0, ll=0, hit=0;
+  const bins = Array.from({length:6}, () => ({ n:0, p:0, y:0 }));
+  rows.forEach(r => {
+    const p = scoreRow(r, w), y = r.awayWon ? 1 : 0;
+    brier += (p-y)*(p-y);
+    ll -= y*Math.log(Math.max(p,1e-9)) + (1-y)*Math.log(Math.max(1-p,1e-9));
+    if ((p >= 0.5) === (y === 1)) hit++;
+    const b = Math.min(5, Math.max(0, Math.floor((p-0.20)/0.10)));
+    bins[b].n++; bins[b].p += p; bins[b].y += y;
+  });
+  const n = rows.length;
+  return {
+    n, brier: brier/n, ll: ll/n, acc: hit/n,
+    skill: 1 - (brier/n)/0.25,
+    bins: bins.map((b,i) => ({
+      lo: 0.20 + i*0.10, hi: 0.30 + i*0.10,
+      n: b.n, pred: b.n ? b.p/b.n : null, act: b.n ? b.y/b.n : null
+    }))
+  };
+}
+
+/* baselines for comparison */
+function baselines(rows) {
+  const n = rows.length;
+  let bHome=0, bTeam=0, homeWins=0;
+  rows.forEach(r => {
+    if (!r.awayWon) homeWins++;
+    const pFlat = 0.46;                       // always back the home side
+    const yA = r.awayWon ? 1 : 0;
+    bHome += (pFlat-yA)*(pFlat-yA);
+    const pTeam = clamp(ilogit(logit(clamp(log5(r.pythA, r.pythB),0.05,0.95)) - 0.155), 0.15, 0.85);
+    bTeam += (pTeam-yA)*(pTeam-yA);
+  });
+  return { flat:0.25, home:bHome/n, teamOnly:bTeam/n, homeRate:homeWins/n };
+}
+
+/* --- load the window --- */
+async function runBacktest() {
+  const start = document.getElementById("btStart").value.trim();
+  const end   = document.getElementById("btEnd").value.trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || !/^\d{4}-\d{2}-\d{2}$/.test(end)) {
+    document.getElementById("btOut").innerHTML =
+      '<div class="msg err"><h3>Check the dates</h3>Both need to be YYYY-MM-DD.</div>';
+    return;
+  }
+  const season = seasonOf(start);
+  BT.loaded = false;
+  document.getElementById("btOut").innerHTML = '<div class="msg">Working…</div>';
+
+  try {
+    btPhase("BUILDING SEASON LEDGER…");
+    const ledger = await buildLedger(season);
+
+    btPhase("PULLING GAMES IN WINDOW…");
+    const sj = await jget(API+"/schedule?sportId=1&startDate="+start+"&endDate="+end
+      +"&gameType=R&hydrate=team,probablePitcher");
+    const wins = (sj.dates||[]).flatMap(d => (d.games||[])
+      .filter(g => g.status?.abstractGameState === "Final")
+      .map(g => ({ date:d.date, g })));
+
+    const ids = [...new Set(wins.flatMap(x =>
+      ["away","home"].map(s => x.g.teams?.[s]?.probablePitcher?.id).filter(Boolean)))];
+
+    btPhase("PULLING "+ids.length+" PITCHER GAME LOGS…");
+    const logs = {};
+    let done = 0;
+    await pool(ids, 6, async id => {
+      const j = await jget(API+"/people/"+id
+        +"?hydrate=stats(group=[pitching],type=[gameLog],season="+season+")");
+      const blk = (j.people?.[0]?.stats||[]).find(b => b.type?.displayName === "gameLog");
+      logs[id] = (blk?.splits||[])
+        .filter(s => Number(s.stat?.gamesStarted) === 1)
+        .map(s => ({ date:s.date, er:Number(s.stat.earnedRuns)||0,
+                     outs: ipToOuts(s.stat.inningsPitched) }))
+        .sort((a,b) => a.date < b.date ? -1 : 1);
+      if (++done % 15 === 0) btPhase("PITCHER LOGS "+done+"/"+ids.length+"…");
+    });
+
+    btPhase("RECONSTRUCTING INPUTS…");
+    const byDate = {};
+    const rows = [];
+    let skipped = 0;
+    for (const { date, g } of wins) {
+      if (!byDate[date]) byDate[date] = ledgerAsOf(ledger, date);
+      const L = byDate[date];
+      const aId = g.teams?.away?.team?.id, hId = g.teams?.home?.team?.id;
+      const pA = pythOf(L.teams[aId]), pB = pythOf(L.teams[hId]);
+      const recA = L.teams[aId], recB = L.teams[hId];
+      // need a real sample of games already played
+      if (!pA || !pB || (recA.w+recA.l) < 20 || (recB.w+recB.l) < 20) { skipped++; continue; }
+      const as = Number(g.teams?.away?.score), hs = Number(g.teams?.home?.score);
+      if (!Number.isFinite(as) || !Number.isFinite(hs) || as === hs) { skipped++; continue; }
+      rows.push({
+        date,
+        awayAb: g.teams?.away?.team?.abbreviation,
+        homeAb: g.teams?.home?.team?.abbreviation,
+        awayWon: as > hs,
+        pythA: pA, pythB: pB, lgEra: L.lgEra,
+        spA: pitcherAsOf(logs[g.teams?.away?.probablePitcher?.id], date),
+        spB: pitcherAsOf(logs[g.teams?.home?.probablePitcher?.id], date)
+      });
+    }
+
+    BT.rows = rows; BT.loaded = true; BT.skipped = skipped;
+    btPhase("");
+    renderBT(M);
+  } catch (e) {
+    btPhase("");
+    document.getElementById("btOut").innerHTML =
+      '<div class="msg err"><h3>Backtest failed</h3>'+esc(e.message)+'</div>';
+  }
+}
+
+/* --- coarse grid search on a chronological split --- */
+function fitWeights() {
+  if (!BT.loaded || BT.rows.length < 60) {
+    document.getElementById("btOut").insertAdjacentHTML("afterbegin",
+      '<div class="msg err">Load a window with at least 60 usable games first.</div>');
+    return;
+  }
+  const sorted = [...BT.rows].sort((a,b) => a.date < b.date ? -1 : 1);
+  const cut = Math.floor(sorted.length * 0.7);
+  const train = sorted.slice(0,cut), test = sorted.slice(cut);
+
+  const grid = {
+    TEAM_REGRESS: [0.65,0.75,0.85,0.95,1.0],
+    SP_PRIOR_IP:  [20,35,50,75,110],
+    SP_L5_WEIGHT: [0,0.15,0.25,0.4],
+    RUNS_TO_LOGIT:[0.22,0.28,0.34,0.40,0.46]
+  };
+  let best = null;
+  for (const tr of grid.TEAM_REGRESS)
+  for (const pr of grid.SP_PRIOR_IP)
+  for (const l5 of grid.SP_L5_WEIGHT)
+  for (const rl of grid.RUNS_TO_LOGIT) {
+    const w = { ...M, TEAM_REGRESS:tr, SP_PRIOR_IP:pr, SP_L5_WEIGHT:l5, RUNS_TO_LOGIT:rl };
+    const e = evaluate(train, w);
+    if (!best || e.ll < best.ll) best = { ll:e.ll, w };
+  }
+  BT.weights = best.w;
+  renderBT(best.w, { train: evaluate(train, best.w), test: evaluate(test, best.w),
+                     testBase: evaluate(test, M), nTrain: train.length, nTest: test.length });
+}
+
+/* --- render --- */
+function renderBT(w, fit) {
+  const out = document.getElementById("btOut");
+  if (!BT.loaded) { out.innerHTML = ""; return; }
+  const e = evaluate(BT.rows, w);
+  const b = baselines(BT.rows);
+  if (!e) { out.innerHTML = '<div class="msg">No usable games in that window.</div>'; return; }
+
+  const f4 = x => x.toFixed(4);
+  const pc = x => (x*100).toFixed(1)+"%";
+
+  const cal = e.bins.filter(x => x.n > 0).map(x =>
+    '<div class="row"><span>'+pc(x.lo)+'–'+pc(x.hi)+'  (n='+x.n+')</span>'
+    + '<span>pred '+pc(x.pred)+' · actual <b style="color:var(--truth)">'+pc(x.act)+'</b></span></div>'
+  ).join("");
+
+  out.innerHTML =
+    '<div class="card"><p class="card-label">Result · '+e.n+' games'
+      + (BT.skipped ? ' · '+BT.skipped+' skipped' : '') + '</p>'
+    + '<dl class="readout">'
+    + '<div class="cell"><dt>Brier</dt><dd class="v-truth">'+f4(e.brier)+'</dd></div>'
+    + '<div class="cell"><dt>Skill vs coin flip</dt><dd class="'
+      +(e.skill>0?"v-truth":"v-vig")+'">'+(e.skill>=0?"+":"")+pc(e.skill)+'</dd></div>'
+    + '<div class="cell"><dt>Log loss</dt><dd>'+f4(e.ll)+'</dd></div>'
+    + '</dl>'
+    + '<div style="margin-top:16px">'
+      + '<div class="row"><span>Accuracy (picked the winner)</span><span>'+pc(e.acc)+'</span></div>'
+      + '<div class="row"><span>Home teams actually won</span><span>'+pc(1-b.homeRate)+'</span></div>'
+      + '<div class="row"><span>Baseline · always 50%</span><span>'+f4(b.flat)+'</span></div>'
+      + '<div class="row"><span>Baseline · always home</span><span>'+f4(b.home)+'</span></div>'
+      + '<div class="row"><span>Baseline · team record only</span><span>'+f4(b.teamOnly)+'</span></div>'
+    + '</div></div>'
+
+    + '<div class="card"><p class="card-label">Calibration</p>'
+    + (cal || '<p style="color:var(--dim);font-size:13px">Not enough spread to bucket.</p>')
+    + '<p style="font-size:12px;color:var(--dim);margin:12px 0 0;line-height:1.5">'
+    + 'Predicted and actual should track each other. Actual consistently below predicted means '
+    + 'the model is overconfident and the weights are too aggressive.</p></div>'
+
+    + (fit ? '<div class="card"><p class="card-label">Fitted weights</p>'
+        + '<div class="row"><span>Train log loss (n='+fit.nTrain+')</span><span>'+f4(fit.train.ll)+'</span></div>'
+        + '<div class="row"><span>Test log loss (n='+fit.nTest+')</span><span class="'
+          +(fit.test.ll < fit.testBase.ll ? "pos":"neg")+'">'+f4(fit.test.ll)+'</span></div>'
+        + '<div class="row"><span>Test log loss · current weights</span><span>'+f4(fit.testBase.ll)+'</span></div>'
+        + '<div style="font-family:var(--mono);font-size:11px;color:var(--dim);margin-top:12px;line-height:1.7">'
+        + 'TEAM_REGRESS  '+w.TEAM_REGRESS+'<br>SP_PRIOR_IP   '+w.SP_PRIOR_IP
+        + '<br>SP_L5_WEIGHT  '+w.SP_L5_WEIGHT+'<br>RUNS_TO_LOGIT '+w.RUNS_TO_LOGIT+'</div>'
+        + '<p style="font-size:12px;color:var(--dim);margin:12px 0 0;line-height:1.5">'
+        + (fit.test.ll < fit.testBase.ll
+            ? 'These beat the current weights on data they were not fitted to. Worth adopting if the gap holds on a second window.'
+            : 'These did <b>not</b> beat the current weights out of sample. That is the fit chasing noise — keep what you have.')
+        + '</p></div>' : '')
+
+    + '<div class="card"><p class="card-label">Adjust and re-score</p><div id="btSliders"></div></div>';
+
+  const specs = [
+    ["TEAM_REGRESS","Team regression",0.5,1.0,0.05],
+    ["HFA_LOGIT","Home field",0.0,0.30,0.005],
+    ["SP_PRIOR_IP","Starter prior (IP)",10,150,5],
+    ["SP_L5_WEIGHT","Last-5 weight",0,0.6,0.05],
+    ["RUNS_TO_LOGIT","Runs → log-odds",0.15,0.55,0.01]
+  ];
+  document.getElementById("btSliders").innerHTML = specs.map(([k,label,lo,hi,st]) =>
+    '<div style="margin-bottom:14px"><div style="display:flex;justify-content:space-between;'
+    + 'font-family:var(--mono);font-size:11px;color:var(--dim)"><span>'+label+'</span>'
+    + '<span id="lab-'+k+'" style="color:var(--truth)">'+w[k]+'</span></div>'
+    + '<input type="range" data-k="'+k+'" min="'+lo+'" max="'+hi+'" step="'+st+'" value="'+w[k]+'" /></div>'
+  ).join("");
+
+  document.querySelectorAll('#btSliders input[type=range]').forEach(sl => {
+    sl.oninput = () => {
+      const k = sl.dataset.k;
+      const cur = { ...w }; cur[k] = Number(sl.value);
+      document.getElementById("lab-"+k).textContent = sl.value;
+      const e2 = evaluate(BT.rows, cur);
+      const cells = document.querySelectorAll(".readout .cell dd");
+      if (cells.length >= 3) {
+        cells[0].textContent = e2.brier.toFixed(4);
+        cells[1].textContent = (e2.skill>=0?"+":"") + (e2.skill*100).toFixed(1)+"%";
+        cells[2].textContent = e2.ll.toFixed(4);
+      }
+      BT.weights = cur;
+    };
+  });
+}
+
+(function initBT(){
+  const end = shift(etToday(), -1);
+  document.getElementById("btEnd").value = end;
+  document.getElementById("btStart").value = shift(end, -29);
+  document.getElementById("btRun").onclick = runBacktest;
+  document.getElementById("btFit").onclick = fitWeights;
+})();
+
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () =>
+    navigator.serviceWorker.register("sw.js").catch(()=>{}));
+}
+</script>
+</body>
+</html>
