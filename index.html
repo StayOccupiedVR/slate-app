@@ -3,281 +3,341 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<meta name="theme-color" content="#0E1622" />
-<meta name="description" content="Daily MLB slate with pitching matchups, bullpen usage, and a log5 win probability model." />
+<meta name="theme-color" content="#0B1420" />
+<meta name="description" content="The day's MLB slate: pitching matchups, bullpen usage, and a transparent win-probability model." />
 <link rel="manifest" href="manifest.webmanifest" />
 <link rel="apple-touch-icon" href="apple-touch-icon.png" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="Slate" />
-<title>Slate · MLB Daily Board</title>
+<title>Slate</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;500;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root {
-    --ink:#0E1622; --panel:#16212E; --panel-2:#1C2937; --line:#27384B;
-    --text:#DEE6ED; --dim:#7E92A8; --faint:#5B6F84;
-    --truth:#5FD0C4; --heat:#D98C3A; --good:#74CF98; --bad:#E8776C;
-    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
-    --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --bg:#0B1420; --bar:#0E1A2B; --card:#12233C; --card-2:#0F1E33;
+    --line:#1B3A5C; --line-2:#12283F;
+    --ink:#FFFFFF; --ink-2:#9FB4CE; --ink-3:#5E7A9A;
+    --green:#1D9E75; --green-txt:#3DD6A0; --amber:#E0A32E; --red:#E24B4A;
+    --chip:#E8ECF1;
+    --sans:-apple-system,system-ui,"Segoe UI",Roboto,sans-serif;
+    --mono:ui-monospace,"SF Mono",Menlo,monospace;
   }
   * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
-  html, body { background:var(--ink); }
-  body {
-    margin:0; color:var(--text); font-family:var(--sans);
-    padding: max(18px, env(safe-area-inset-top)) 14px
-             calc(76px + env(safe-area-inset-bottom)) 14px;
-    -webkit-text-size-adjust:100%;
-  }
-  .wrap { max-width:680px; margin:0 auto; }
+  html,body { background:var(--bg); }
+  body { margin:0; color:var(--ink); font-family:var(--sans);
+    font-size:16px; line-height:1.45;
+    padding: max(0px, env(safe-area-inset-top)) 0 calc(72px + env(safe-area-inset-bottom));
+    -webkit-text-size-adjust:100%; font-variant-numeric:tabular-nums; }
+  .wrap { max-width:560px; margin:0 auto; }
   .hide { display:none !important; }
 
-  .eyebrow { font-family:var(--mono); font-size:10px; letter-spacing:.18em;
-    text-transform:uppercase; color:var(--dim); margin:0 0 6px; }
-  h1 { font-size:27px; font-weight:600; letter-spacing:-.025em; margin:0 0 3px; line-height:1.1; }
-  h1 em { font-style:normal; color:var(--truth); }
-  .sub { color:var(--dim); font-size:13px; margin:0; }
-  .lede { color:var(--dim); font-size:13.5px; line-height:1.5; margin:0 0 22px; max-width:52ch; }
+  /* masthead */
+  .mast { background:var(--bar); padding:12px 16px;
+    display:flex; justify-content:space-between; align-items:center;
+    border-bottom:1px solid var(--line); position:sticky; top:0; z-index:10; }
+  .logo { font-weight:800; font-size:19px; letter-spacing:-.02em; margin:0; }
+  .logo b { color:var(--green-txt); }
+  .mast-meta { font-size:12px; color:var(--ink-3); font-weight:600; }
 
-  button {
-    font-family:var(--sans); font-size:13px; font-weight:500;
-    background:var(--panel); color:var(--text); border:1px solid var(--line);
-    border-radius:7px; padding:9px 13px; cursor:pointer; transition:border-color .15s;
-  }
-  button:hover { border-color:var(--truth); }
-  button:focus-visible { outline:2px solid var(--truth); outline-offset:2px; }
-  button.ghost { color:var(--dim); }
+  /* controls */
+  .bar { display:flex; gap:7px; align-items:center; padding:11px 14px 4px; flex-wrap:wrap; }
+  button { font-family:var(--sans); font-size:13px; font-weight:600; color:var(--ink-2);
+    background:var(--card); border:none; border-radius:20px; padding:6px 13px; cursor:pointer; }
+  button:hover { color:var(--ink); }
+  .pill-on { background:var(--chip) !important; color:var(--bg) !important; }
+  .nav-btn { background:var(--card); border-radius:8px; width:34px; height:34px; padding:0;
+    font-size:16px; color:var(--ink-2); }
+  .grow { flex:1; }
+  .today { font-family:var(--sans); font-size:11px; font-weight:700; color:var(--bg);
+    background:var(--chip); border-radius:20px; padding:5px 12px; }
+  #phase { font-size:10px; color:var(--ink-3); letter-spacing:.05em; padding:2px 16px 0;
+    min-height:12px; text-transform:uppercase; }
 
-  /* bottom tab bar */
-  .tabs {
-    position:fixed; left:0; right:0; bottom:0; z-index:20;
-    display:flex; background:rgba(14,22,34,.94);
-    backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
-    border-top:1px solid var(--line);
-    padding-bottom:env(safe-area-inset-bottom);
-  }
-  .tabs button {
-    flex:1; border:none; background:none; border-radius:0;
-    padding:14px 6px; color:var(--faint); font-size:11px; font-weight:600;
-    letter-spacing:.1em; text-transform:uppercase; font-family:var(--mono);
-  }
-  .tabs button.on { color:var(--truth); box-shadow:inset 0 2px 0 var(--truth); }
-  .tabs button:hover { border:none; }
+  /* game card */
+  .board { padding:8px 12px; }
+  .game { background:var(--card); border-radius:11px; padding:12px 14px; margin-bottom:9px; }
+  .game.value { border:1px solid var(--line); }
+  .g-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:9px; }
+  .g-when { font-size:11px; color:var(--ink-3); font-weight:600; }
+  .g-venue { font-size:11px; color:var(--ink-3); font-weight:600;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-left:10px; }
+  .g-badge { font-size:10px; font-weight:800; color:var(--bg); background:var(--green-txt);
+    padding:3px 8px; border-radius:4px; letter-spacing:.03em; white-space:nowrap; }
+  .g-live { font-size:11px; font-weight:800; color:var(--green-txt); letter-spacing:.02em; white-space:nowrap; }
+  .g-live .dot { animation:pulse 2s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+  @media (prefers-reduced-motion:reduce){ .g-live .dot{animation:none} }
 
-  .nav { display:flex; gap:8px; align-items:center; margin:16px 0 12px; }
-  .spacer { flex:1; }
-  .today-chip { font-family:var(--mono); font-size:11px; color:var(--truth);
-    border:1px solid var(--truth); border-radius:20px; padding:4px 10px; }
-  #phase { font-family:var(--mono); font-size:10.5px; color:var(--faint);
-    letter-spacing:.08em; margin:0 0 16px; min-height:14px; }
+  .t-row { display:flex; justify-content:space-between; align-items:center; padding:3px 0; }
+  .t-left { display:flex; align-items:center; gap:9px; min-width:0; }
+  .t-chip { width:26px; height:26px; border-radius:6px; font-weight:800; font-size:10px;
+    display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .t-name { font-size:17px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .t-rec { font-size:12px; color:var(--ink-3); flex-shrink:0; }
+  .t-row.dim .t-name { color:var(--ink-2); }
+  .pct { font-size:19px; font-weight:800; min-width:50px; text-align:center; }
+  .pct.win { color:var(--ink); background:var(--green); padding:2px 10px; border-radius:7px; }
+  .pct.lose { color:var(--ink-3); padding:2px 10px; }
+  .score { font-size:21px; font-weight:800; min-width:34px; text-align:right; }
 
-  /* ---- board ---- */
-  .game { background:var(--panel); border:1px solid var(--line);
-    border-radius:10px; margin-bottom:11px; overflow:hidden; }
-  .game-head { display:flex; justify-content:space-between; align-items:center;
-    padding:9px 14px; border-bottom:1px solid var(--line); background:var(--panel-2);
-    font-family:var(--mono); font-size:11px; letter-spacing:.06em; }
-  .venue { color:var(--dim); overflow:hidden; text-overflow:ellipsis;
-    white-space:nowrap; margin-left:10px; text-align:right; }
-  .dh { color:var(--heat); border:1px solid var(--heat); border-radius:4px;
-    padding:1px 5px; font-size:9px; margin-left:7px; }
-  .final { color:var(--dim); }
+  .arms { display:flex; justify-content:space-between; font-size:12px; color:var(--ink-3);
+    margin-top:9px; padding-top:9px; border-top:1px solid var(--line); }
+  .arms b { color:var(--ink-2); font-weight:600; }
+  .arms .tbd { font-style:italic; }
 
-  .side { display:grid; grid-template-columns:1fr auto; gap:10px;
-    padding:11px 14px; align-items:start; }
-  .side + .side { border-top:1px solid var(--line); }
-  .team-line { display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; }
-  .abbr { font-size:16px; font-weight:700; letter-spacing:-.01em; }
-  .rec { font-family:var(--mono); font-size:12px; color:var(--dim); }
-  .l10 { font-family:var(--mono); font-size:11px; color:var(--dim); }
-  .l10 b { color:var(--text); font-weight:600; }
-  .strk { font-family:var(--mono); font-size:10px; font-weight:700;
-    padding:1px 5px; border-radius:3px; }
-  .strk.w { color:var(--good); border:1px solid var(--good); }
-  .strk.l { color:var(--bad); border:1px solid var(--bad); }
-  .teammeta { font-family:var(--mono); font-size:10.5px; color:var(--faint);
-    margin-top:4px; display:flex; gap:9px; flex-wrap:wrap; }
-  .rd.pos { color:var(--good); }
-  .rd.neg { color:var(--bad); }
-  .pen.tired { color:var(--heat); }
+  .scratch { font-size:12px; color:var(--amber); font-weight:600; margin-top:9px;
+    padding-top:9px; border-top:1px solid var(--line); }
+  .scratch .wx-note { font-weight:400; }
+  .wx { display:flex; gap:14px; flex-wrap:wrap; font-size:12px; color:var(--ink-2);
+    margin-top:9px; padding-top:9px; border-top:1px solid var(--line); }
+  .wx-note { color:var(--ink-3); font-style:italic; }
+  .wx-dome { color:var(--ink-3); }
+  .wx.wx-alert { color:var(--amber); }
+  .wx.wx-alert .wx-note { color:var(--amber); }
+  .tovalue { display:block; width:100%; text-align:center; margin-top:9px;
+    background:var(--card-2); color:var(--green-txt); font-weight:700; font-size:13px;
+    padding:9px; border-radius:8px; }
+  .tovalue:hover { background:#0B1A2E; }
 
-  .pitcher { margin-top:8px; font-size:13px;
-    border-left:2px solid var(--line); padding-left:9px; }
-  .nm { font-weight:500; }
-  .hand { color:var(--dim); font-size:11px; margin-left:4px; }
-  .pline { font-family:var(--mono); font-size:11px; color:var(--dim);
-    margin-top:2px; display:flex; gap:9px; flex-wrap:wrap; }
-  .era { color:var(--truth); font-weight:600; }
-  .l5, .split { font-family:var(--mono); font-size:10.5px; color:var(--faint); margin-top:2px; }
-  .l5 b, .split b { color:var(--dim); font-weight:600; }
-  .tbd { color:var(--dim); font-style:italic; font-size:13px; margin-top:8px; }
-  .score { font-family:var(--mono); font-size:21px; font-weight:700;
-    min-width:34px; text-align:right; }
+  details.d { margin-top:8px; }
+  details.d > summary { list-style:none; cursor:pointer; font-size:12px; color:var(--ink-3);
+    font-weight:600; padding:6px 0 2px; display:flex; align-items:center; gap:5px; }
+  details.d > summary::-webkit-details-marker { display:none; }
+  details.d > summary::after { content:"›"; transition:transform .15s; }
+  details.d[open] > summary::after { transform:rotate(90deg); }
+  .det { padding-top:8px; }
+  .det table { width:100%; border-collapse:collapse; font-size:12.5px; }
+  .det th { text-align:left; font-weight:600; color:var(--ink-3); font-size:11px;
+    text-transform:uppercase; letter-spacing:.04em; padding:8px 0 4px; }
+  .det td { padding:3px 0; color:var(--ink-2); }
+  .det td:first-child { color:var(--ink-3); width:52%; }
+  .det td.num { text-align:right; font-variant-numeric:tabular-nums; color:var(--ink); }
+  .det .why { font-size:12px; color:var(--ink-3); margin:9px 0 0; line-height:1.55; }
+  .lu-h { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.04em;
+    color:var(--ink-3); margin:12px 0 6px; }
+  .lu-h.muted { text-transform:none; font-weight:400; letter-spacing:0; font-size:12px;
+    color:var(--ink-3); line-height:1.5; }
+  .lu { display:grid; grid-template-columns:1fr 1fr; gap:0 14px; font-size:12.5px; }
+  .lu b { display:block; font-size:11px; color:var(--ink-3); margin-bottom:3px; }
+  .lu span { display:block; padding:1.5px 0; color:var(--ink-2); }
+  .lu i { font-style:normal; color:var(--ink-3); font-size:11px; }
 
-  .model { border-top:1px solid var(--line); background:var(--panel-2); padding:11px 14px; }
-  .model-top { display:flex; justify-content:space-between; align-items:baseline;
-    gap:10px; flex-wrap:wrap; }
-  .model-lab { font-family:var(--mono); font-size:9.5px; letter-spacing:.16em;
-    text-transform:uppercase; color:var(--faint); }
-  .model-nums { font-family:var(--mono); font-size:13px; font-weight:600; }
-  .model-nums .fav { color:var(--truth); }
-  .model-nums .sep { color:var(--faint); font-weight:400; margin:0 5px; }
-  .bar { display:flex; height:6px; border-radius:3px; overflow:hidden;
-    margin:9px 0 7px; background:var(--ink); }
-  .bar .a { background:var(--truth); }
-  .bar .b { background:#4E6274; }
-  .parts { font-family:var(--mono); font-size:10px; color:var(--faint);
-    display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
-  .parts .up { color:var(--good); }
-  .parts .dn { color:var(--bad); }
-  .toev { font-family:var(--mono); font-size:9.5px; letter-spacing:.1em;
-    padding:4px 9px; border-radius:5px; margin-left:auto;
-    background:transparent; border:1px solid var(--line); color:var(--dim); }
+  .home-hero { display:flex; flex-direction:column; align-items:center;
+    padding:26px 16px 14px; }
+  .home-logo { width:min(240px, 60vw); height:auto; border-radius:14px; }
+  .home-tag { font-size:13px; color:var(--ink-3); font-weight:600; margin:12px 0 0;
+    letter-spacing:.03em; }
+  .sport { background:var(--card); border-radius:11px; padding:14px; margin-bottom:10px; }
+  .sport.live { border:1px solid var(--line); cursor:pointer; }
+  .sport.live:hover { background:#152A47; }
+  .sport.soon { opacity:.85; }
+  .sport-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
+  .sport-name { font-size:18px; font-weight:800; }
+  .sport-sub { font-size:13px; color:var(--ink-2); margin:0; line-height:1.5; }
+  .sport-cta { font-size:13px; font-weight:700; color:var(--green-txt); margin:9px 0 0; }
+  .back { background:none; border:none; color:var(--ink-2); font-size:13px; font-weight:600;
+    padding:0; cursor:pointer; }
+  .back:hover { color:var(--ink); }
+  .note { background:var(--card); border-radius:11px; padding:20px; text-align:center;
+    color:var(--ink-2); font-size:14px; margin:8px 12px; }
+  .note h3 { margin:0 0 6px; color:var(--ink); font-size:15px; }
+  .note.err { border:1px solid var(--red); }
 
-  .msg { border:1px solid var(--line); background:var(--panel); border-radius:10px;
-    padding:22px 18px; text-align:center; color:var(--dim); font-size:14px; line-height:1.55; }
-  .msg.err { border-color:var(--bad); }
-  .msg h3 { color:var(--text); font-size:15px; margin:0 0 8px; }
-  .msg button { margin-top:14px; }
+  /* tabs */
+  .tabs { position:fixed; left:0; right:0; bottom:0; z-index:20; display:flex;
+    background:var(--bar); border-top:1px solid var(--line);
+    padding-bottom:env(safe-area-inset-bottom); }
+  .tabs button { flex:1; border-radius:0; background:none; padding:12px 4px 11px;
+    font-size:11px; font-weight:700; letter-spacing:.04em; color:var(--ink-3); }
+  .tabs button[aria-pressed="true"] { color:var(--green-txt); box-shadow:inset 0 2px 0 var(--green-txt); }
 
-  /* ---- calculator ---- */
-  .card { background:var(--panel); border:1px solid var(--line);
-    border-radius:10px; padding:18px 16px; margin-bottom:14px; }
-  .card-label { font-family:var(--mono); font-size:10px; letter-spacing:.16em;
-    text-transform:uppercase; color:var(--dim); margin:0 0 14px; }
-  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
-  @media (max-width:520px){ .grid2 { grid-template-columns:1fr; } }
-  .field { display:flex; flex-direction:column; gap:7px; }
-  .field label { font-family:var(--mono); font-size:10px; letter-spacing:.14em;
-    text-transform:uppercase; color:var(--dim); }
-  input[type=text] {
-    background:var(--ink); border:1px solid var(--line); border-radius:6px;
-    color:var(--text); font-family:var(--mono); font-size:15px; padding:10px 12px; width:100%;
-  }
-  input[type=text]:focus { outline:2px solid var(--truth); outline-offset:1px; border-color:var(--truth); }
-  input.odds { font-size:20px; }
-  input.bad-input { border-color:var(--bad); }
-  .hint { font-size:11px; color:var(--bad); font-family:var(--mono); min-height:14px; }
+  /* value + backtest tabs */
+  .pad { padding:16px; }
+  h2 { font-size:21px; font-weight:800; letter-spacing:-.015em; margin:0 0 4px; }
+  .lede { color:var(--ink-2); font-size:14px; margin:0 0 18px; }
+  .block { background:var(--card); border-radius:11px; padding:14px; margin-bottom:10px; }
+  .block > h3 { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.05em;
+    color:var(--ink-3); margin:0 0 12px; }
+  .two { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  label { display:block; font-size:11px; font-weight:600; text-transform:uppercase;
+    letter-spacing:.04em; color:var(--ink-3); margin-bottom:6px; }
+  input[type=text] { width:100%; background:var(--card-2); color:var(--ink);
+    border:1px solid var(--line); border-radius:8px; padding:10px 11px;
+    font-family:var(--mono); font-size:15px; }
+  input[type=text]:focus { outline:none; border-color:var(--green-txt); }
+  input.big { font-size:20px; font-weight:600; }
+  input.bad { border-color:var(--red); }
+  .hint { font-size:11px; color:var(--red); min-height:14px; }
+  input[type=range] { width:100%; -webkit-appearance:none; background:transparent; margin:12px 0 2px; }
+  input[type=range]::-webkit-slider-runnable-track { height:4px; background:var(--line); border-radius:2px; }
+  input[type=range]::-moz-range-track { height:4px; background:var(--line); border-radius:2px; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:20px; height:20px;
+    border-radius:50%; background:var(--green-txt); margin-top:-8px; }
+  input[type=range]::-moz-range-thumb { width:20px; height:20px; border-radius:50%;
+    background:var(--green-txt); border:none; }
+  .ans-word { font-size:22px; font-weight:800; letter-spacing:-.015em; margin:0 0 2px; }
+  .ans-word.pos { color:var(--green-txt); }
+  .ans-big { font-size:44px; font-weight:800; letter-spacing:-.02em; margin:2px 0 6px;
+    color:var(--green-txt); font-variant-numeric:tabular-nums; }
+  .ans-big span { font-size:14px; font-weight:400; color:var(--ink-2); margin-left:8px; }
+  .ans-sub { font-size:14px; color:var(--ink-2); margin:0; max-width:46ch; }
+  .meter { position:relative; height:10px; background:var(--card-2); border-radius:5px;
+    margin:16px 0 7px; overflow:visible; }
+  .meter i { display:block; height:100%; background:var(--line); border-radius:5px; }
+  .meter b { position:absolute; top:-4px; bottom:-4px; width:3px; background:var(--green-txt);
+    border-radius:2px; }
+  .meter-lab { display:flex; justify-content:space-between; font-size:12px; color:var(--ink-3);
+    font-weight:600; }
+  .stat-row { display:flex; justify-content:space-between; font-size:13px; padding:7px 0;
+    border-top:1px solid var(--line); }
+  .stat-row:first-of-type { border-top:none; }
+  .stat-row span:first-child { color:var(--ink-2); }
+  .pos { color:var(--green-txt); } .neg { color:var(--red); }
+  .fold summary { font-size:13px; color:var(--ink-3); font-weight:600; padding:12px 0 0;
+    cursor:pointer; list-style:none; }
+  .fold summary::-webkit-details-marker { display:none; }
+  .fold summary::after { content:" ›"; }
+  .fold[open] summary::after { content:" ⌄"; }
+  .ev-note { font-size:14px; color:var(--ink-2); background:var(--card-2);
+    border-left:3px solid var(--green-txt); border-radius:0 8px 8px 0;
+    padding:10px 12px; margin:0 0 10px; }
 
-  .barrow { margin-bottom:16px; }
-  .barhead { display:flex; justify-content:space-between; font-family:var(--mono);
-    font-size:10px; letter-spacing:.14em; text-transform:uppercase;
-    color:var(--dim); margin-bottom:7px; }
-  .track { position:relative; height:34px; background:var(--ink);
-    border:1px solid var(--line); border-radius:5px; overflow:hidden; display:flex; }
-  .seg { display:flex; align-items:center; justify-content:center;
-    font-family:var(--mono); font-size:12px; font-weight:600; color:var(--ink);
-    transition:width .4s cubic-bezier(.4,0,.2,1); white-space:nowrap; overflow:hidden; }
-  .seg-a { background:var(--truth); }
-  .seg-b { background:#4E6274; color:var(--text); }
-  .marker { position:absolute; top:-3px; bottom:-3px; width:2px;
-    background:var(--text); box-shadow:0 0 0 2px var(--panel); z-index:3; }
-  .mtag { position:absolute; transform:translateX(-50%); font-family:var(--mono);
-    font-size:9px; color:var(--dim); padding-top:4px; }
-
-  .readout { display:grid; grid-template-columns:repeat(3,1fr); gap:1px;
-    background:var(--line); border:1px solid var(--line); border-radius:8px;
-    overflow:hidden; margin-top:22px; }
-  @media (max-width:520px){ .readout { grid-template-columns:1fr; } }
-  .cell { background:var(--panel-2); padding:13px; }
-  .cell dt { font-family:var(--mono); font-size:9px; letter-spacing:.14em;
-    text-transform:uppercase; color:var(--dim); margin:0 0 6px; }
-  .cell dd { margin:0; font-family:var(--mono); font-size:19px; font-weight:600; }
-  .cell dd small { font-size:11px; font-weight:400; color:var(--dim); margin-left:5px; }
-  .v-truth { color:var(--truth); } .v-vig { color:var(--heat); }
-
-  .slider-val { font-family:var(--mono); font-size:26px; font-weight:600; color:var(--truth); }
-  .slider-val span { font-size:13px; color:var(--dim); font-weight:400; margin-left:6px; }
-  input[type=range] { width:100%; -webkit-appearance:none; appearance:none;
-    background:transparent; margin:8px 0 4px; }
-  input[type=range]::-webkit-slider-runnable-track { height:5px; background:var(--line); border-radius:3px; }
-  input[type=range]::-moz-range-track { height:5px; background:var(--line); border-radius:3px; }
-  input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:24px; height:24px;
-    border-radius:50%; background:var(--truth); border:3px solid var(--panel); margin-top:-10px; }
-  input[type=range]::-moz-range-thumb { width:24px; height:24px; border-radius:50%;
-    background:var(--truth); border:3px solid var(--panel); }
-  .scale { display:flex; justify-content:space-between; font-family:var(--mono);
-    font-size:10px; color:var(--dim); }
-
-  .sides { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
-  @media (max-width:520px){ .sides { grid-template-columns:1fr; } }
-  .sidecard { border:1px solid var(--line); border-radius:8px; padding:14px; background:var(--panel-2); }
-  .sidecard.win { border-color:var(--good); }
-  .side-name { font-size:14px; font-weight:600; margin:0 0 2px; }
-  .side-ml { font-family:var(--mono); font-size:11px; color:var(--dim); margin-bottom:11px; }
-  .row { display:flex; justify-content:space-between; font-family:var(--mono);
-    font-size:12px; padding:5px 0; border-top:1px solid var(--line); }
-  .row:first-of-type { border-top:none; }
-  .row span:first-child { color:var(--dim); }
-  .row span:last-child { font-weight:600; }
-  .pos { color:var(--good); } .neg { color:var(--bad); }
-  .verdict { margin-top:14px; padding:14px; border-radius:8px; border:1px solid var(--line);
-    background:var(--panel); font-size:14px; line-height:1.55; }
-  .verdict.yes { border-color:var(--good); }
-  .verdict strong { color:var(--good); }
-  .verdict.no strong { color:var(--dim); }
-
-  .foot { margin-top:22px; padding-top:16px; border-top:1px solid var(--line);
-    font-size:11.5px; line-height:1.65; color:var(--dim); }
-  .foot b { color:var(--text); font-weight:600; }
-  .foot p { margin:0 0 9px; }
-  .key { font-family:var(--mono); font-size:10.5px; }
-  .warn { border-left:2px solid var(--heat); padding-left:10px; }
+  /* help */
+  .help { margin:10px 16px 0; border-top:1px solid var(--line); }
+  .help summary { font-size:12px; color:var(--ink-3); font-weight:600; padding:12px 0;
+    cursor:pointer; list-style:none; }
+  .help summary::-webkit-details-marker { display:none; }
+  .help summary::before { content:"ⓘ "; }
+  .help-body { font-size:13px; color:var(--ink-2); line-height:1.6; padding-bottom:16px; }
+  .help-body p { margin:0 0 10px; }
+  .help-body b { color:var(--ink); font-weight:700; }
+  .help-body .warn { border-left:2px solid var(--amber); padding-left:10px; }
 </style>
 </head>
 <body>
 
-<!-- ===================== BOARD ===================== -->
-<div class="wrap" id="view-board">
-  <p class="eyebrow">Daily slate · live from MLB Stats API</p>
-  <h1 id="title">Loading…</h1>
-  <p class="sub" id="sub">Pulling the board…</p>
-
-  <div class="nav">
-    <button id="prev">← Prev</button>
-    <button id="next">Next →</button>
-    <span class="spacer"></span>
-    <span id="todayBtn"></span>
+<div class="wrap" id="view-home">
+  <div class="home-hero">
+    <img src="logo.png" alt="Slate" class="home-logo"
+         onerror="this.classList.add('hide');document.getElementById('logo-fallback').classList.remove('hide')" />
+    <h1 class="logo hide" id="logo-fallback" style="font-size:34px">SLATE<b>.</b></h1>
+    <p class="home-tag">Transparent sports analytics</p>
   </div>
-  <p id="phase"></p>
 
-  <div id="board"></div>
+  <div class="pad" style="padding-top:0">
+    <p class="lede" style="margin-bottom:14px;text-align:center">A model with a public,
+    timestamped record — graded against sportsbook closing lines, losses included.</p>
 
-  <div class="foot">
-    <p class="key"><b>RD</b> run differential · <b>PYTH</b> expected record from runs
-      scored and allowed · <b>PEN L3</b> relief pitches over the last three days, plus
-      arms used on two or more of those days · <b>L5</b> the starter's last five starts ·
-      <b>Opp lineup</b> the other team's OPS against this pitcher's hand.</p>
-    <p><b>How the model works.</b> Pythagorean win percentage, regressed toward .500 and
-      combined with log5. Home field adds about four points. Starters are scored against
-      the league's actual ERA, blending season with last five starts and regressing small
-      samples toward the mean, then converted from runs into win probability. Platoon
-      splits contribute a smaller offensive term.</p>
-    <p class="warn"><b>What it isn't.</b> The model knows nothing about lineups, park
-      factors, defense, bullpen quality, weather, or injuries. When it disagrees sharply
-      with the market, assume the model is wrong — the market has more information than
-      four inputs. Treat it as a sanity check, not a signal.</p>
+    <div class="sport live" id="go-mlb">
+      <div class="sport-head">
+        <span class="sport-name">⚾ MLB</span>
+        <span class="g-badge">LIVE</span>
+      </div>
+      <p class="sport-sub">Today's board · win probabilities · value checks ·
+      weather, lineups &amp; scratches</p>
+      <p class="sport-cta">Open the board →</p>
+    </div>
+
+    <div class="sport soon">
+      <div class="sport-head">
+        <span class="sport-name">🏈 NFL</span>
+        <span class="g-badge" style="background:var(--amber)">SEPTEMBER</span>
+      </div>
+      <p class="sport-sub">Ledger opens with the season. Team strength from point
+      differential, QB continuity from EPA — same method, same public grading.</p>
+    </div>
+
+    <div class="sport soon">
+      <div class="sport-head">
+        <span class="sport-name">📊 Player props</span>
+        <span class="g-badge" style="background:var(--ink-3)">IN DEVELOPMENT</span>
+      </div>
+      <p class="sport-sub">Graded prop projections — not picks. Ships only once
+      projections can be filed and publicly graded like everything else here.</p>
+    </div>
+
+    <div class="sport soon">
+      <div class="sport-head">
+        <span class="sport-name">🥊 UFC &nbsp;·&nbsp; ⛳ PGA</span>
+        <span class="g-badge" style="background:var(--ink-3)">ROADMAP</span>
+      </div>
+      <p class="sport-sub">On deck after NFL. Each sport gets its own backtest,
+      its own ledger, and its own record before it gets a page.</p>
+    </div>
+
+    <details class="help" style="margin:16px 0 0">
+      <summary>Why the record matters</summary>
+      <div class="help-body">
+        <p>Every prediction here is committed to a public repository before first
+        pitch, graded against final scores and the closing line, and never
+        edited. Wins and losses both stay on the board. That's the whole
+        pitch: not that the model beats the market — most days it won't — but
+        that you can verify exactly how it does.</p>
+      </div>
+    </details>
   </div>
 </div>
 
-<!-- ===================== EV ===================== -->
-<div class="wrap hide" id="view-ev">
-  <p class="eyebrow">Moneyline · no-vig · expected value</p>
-  <h1>Find the <em>true</em> number under the book's price.</h1>
-  <p class="lede">Enter both sides of a moneyline. This strips the sportsbook's margin to
-    show the fair probability, then checks your estimate against it.</p>
+<div class="wrap" id="view-board">
+  <div class="mast">
+    <div style="display:flex;align-items:center;gap:12px">
+      <button class="back" id="toHome">‹ Home</button>
+      <h1 class="logo" style="font-size:17px">MLB</h1>
+    </div>
+    <span class="mast-meta" id="sub"></span>
+  </div>
 
-  <div class="card">
-    <p class="card-label">The two prices</p>
-    <div class="grid2">
-      <div class="field">
+  <div class="bar">
+    <button class="nav-btn" id="prev">‹</button>
+    <button class="nav-btn" id="next">›</button>
+    <span id="todaySlot"></span>
+    <span class="grow"></span>
+    <button id="sortTime" class="pill-on">Time</button>
+    <button id="sortEdge">Edge</button>
+  </div>
+  <p id="phase"></p>
+
+  <div class="board" id="board"></div>
+
+  <details class="help">
+    <summary>How the model works</summary>
+    <div class="help-body">
+      <p>Team strength comes from <b>Pythagorean win percentage</b> — expected record
+      from runs scored and allowed — regressed toward .500 and combined with log5.
+      Home field adds about four points. Starters are graded against the league's
+      actual ERA, blending season with last five starts and regressing small samples
+      toward the mean.</p>
+      <p class="warn">The board shows lineups, scratches, weather, and bullpen
+      availability so you can check them before betting — but the win probability
+      itself is built only from team strength and starters. It doesn't yet model parks,
+      defense, or lineups. When it disagrees sharply with the market, assume the model
+      is wrong. A perfect forecaster scores about .673 on log loss; this one is at .683.
+      Most baseball games are close to coin flips.</p>
+    </div>
+  </details>
+</div>
+
+<div class="wrap hide" id="view-ev">
+  <h2>The true number under the price</h2>
+  <p class="lede">Enter both sides of a moneyline. This strips the book's margin, then
+  checks your estimate against what's left.</p>
+
+  <div class="block">
+    <h3>The two prices</h3>
+    <div class="two">
+      <div>
         <label for="nameA">Side A</label>
         <input type="text" id="nameA" value="Away" />
-        <input type="text" class="odds" id="mlA" value="-150" aria-label="Side A moneyline" />
+        <div style="height:7px"></div>
+        <input type="text" class="big" id="mlA" value="-150" aria-label="Side A moneyline" />
         <span class="hint" id="hintA"></span>
       </div>
-      <div class="field">
+      <div>
         <label for="nameB">Side B</label>
         <input type="text" id="nameB" value="Home" />
-        <input type="text" class="odds" id="mlB" value="+130" aria-label="Side B moneyline" />
+        <div style="height:7px"></div>
+        <input type="text" class="big" id="mlB" value="+130" aria-label="Side B moneyline" />
         <span class="hint" id="hintB"></span>
       </div>
     </div>
@@ -285,66 +345,152 @@
 
   <div id="evBody"></div>
 
-  <div class="foot">
-    <p><b>Edge</b> is your probability minus the fair probability. <b>EV</b> is the average
-      return per $100 if you repeated the bet forever. <b>Kelly</b> is the bankroll share
-      that maximizes long-run growth — most people size at half Kelly or less, because full
-      Kelly assumes your estimate is exactly right and swings hard when it isn't.</p>
-    <p>This tool doesn't find edges. It checks the arithmetic on an estimate you supply.
-      If that estimate is a hunch, the output is a hunch with decimal places.</p>
-  </div>
+  <details class="help">
+    <summary>What these numbers mean</summary>
+    <div class="help-body">
+      <p>A sportsbook's two prices always add up to more than 100% — the extra is
+      its cut. Remove the cut and you get the <b>break-even</b>: how often your side
+      must win before the bet pays. If your estimate is above that line, the average
+      result is profit; the verdict shows how much per $100.</p>
+      <p class="warn">This doesn't find winners. It checks arithmetic on an estimate
+      you supply. If the estimate is a hunch, the answer is a hunch with a dollar
+      sign on it.</p>
+    </div>
+  </details>
 </div>
 
-
-<!-- ===================== BACKTEST ===================== -->
 <div class="wrap hide" id="view-bt">
-  <p class="eyebrow">Backtest · point-in-time · calibration</p>
-  <h1>Did the model <em>actually</em> know anything?</h1>
-  <p class="lede">Replays past games using only what was knowable that morning, then scores the
-    predictions. Weights re-fit instantly once the data is loaded.</p>
+  <h2>Did the model know anything?</h2>
+  <p class="lede">Replays past games using only what was knowable that morning, then
+  scores the predictions.</p>
 
-  <div class="card">
-    <p class="card-label">Window</p>
-    <div class="grid2">
-      <div class="field"><label for="btStart">Start</label>
-        <input type="text" id="btStart" placeholder="YYYY-MM-DD" /></div>
-      <div class="field"><label for="btEnd">End</label>
-        <input type="text" id="btEnd" placeholder="YYYY-MM-DD" /></div>
+  <div class="block">
+    <h3>Window</h3>
+    <div class="two">
+      <div><label for="btStart">Start</label><input type="text" id="btStart" placeholder="YYYY-MM-DD" /></div>
+      <div><label for="btEnd">End</label><input type="text" id="btEnd" placeholder="YYYY-MM-DD" /></div>
     </div>
-    <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
+    <div style="display:flex;gap:7px;margin-top:13px">
       <button id="btRun">Run backtest</button>
-      <button class="ghost" id="btFit">Fit weights</button>
+      <button id="btFit">Fit weights</button>
     </div>
-    <p id="btPhase" style="font-family:var(--mono);font-size:10.5px;color:var(--faint);
-       letter-spacing:.08em;margin:12px 0 0;min-height:14px"></p>
+    <p id="btPhase" style="font-family:var(--mono);font-size:10px;color:var(--ink-3);
+       letter-spacing:.06em;margin:11px 0 0;min-height:13px;text-transform:uppercase"></p>
   </div>
 
   <div id="btOut"></div>
 
-  <div class="foot">
-    <p><b>Brier score</b> is the mean squared error of the probabilities. Lower is better;
-      always guessing 50% scores .2500. <b>Skill</b> is how much better than that guess the
-      model does, as a percentage. <b>Log loss</b> punishes confident mistakes harder.
-      <b>Calibration</b> is the one that matters most: when the model says 60%, does that
-      group actually win about 60% of the time?</p>
-    <p class="warn"><b>Fitting overfits.</b> The fit button splits the window chronologically,
-      tunes on the earlier 70%, and reports on the held-out 30%. Trust the test column, not the
-      train column. With fewer than a few hundred games, even that is thin — a fitted weight
-      that improves test log loss by a hair is probably noise.</p>
-    <p><b>What's excluded.</b> The platoon term is dropped here because team splits can't be
-      reconstructed as of a past date from this API. The backtest scores team strength, home
-      field, and starters only. League ERA is approximated from runs per game to date, which
-      shifts both sides almost equally and largely cancels.</p>
-  </div>
+  <details class="help">
+    <summary>What this tab does</summary>
+    <div class="help-body">
+      <p><b>Run backtest</b> replays every game in your window using only what was
+      knowable that morning — records, run differentials, and starter stats
+      <i>as of that date</i>, never anything that happened after. It generates a
+      probability for each game, then grades those probabilities against what
+      actually happened.</p>
+      <p><b>How to read the scores.</b> <b>Brier</b> is the average squared error —
+      always guessing 50% scores .2500, so anything lower means the model knew
+      something. <b>Log loss</b> is similar but punishes confident mistakes much
+      harder: calling 80% on a loser hurts far more than calling 55%. For scale,
+      a coin flip scores .693 and a perfect forecaster about .673 — baseball is
+      mostly coin flips, so the entire range of possible skill is narrow.</p>
+      <p><b>Calibration is the number to trust first.</b> It groups games by what
+      the model said — all the ~60% calls together — and checks whether that group
+      actually won about 60% of the time. When it does, the percentages mean what
+      they say. When it doesn't, they're decoration, no matter how the other
+      scores look.</p>
+      <p><b>Fit weights</b> asks whether different dial settings — more weight on
+      team strength, less on the starter, and so on — would have predicted this
+      window better. To keep it honest it tunes on the earlier 70% of your window
+      and grades itself only on the later 30% it never saw. <b>Trust only the test
+      column.</b> The train column always looks better; that's memorization, not
+      skill.</p>
+      <p class="warn">Two honest limits. Small windows lie — a few hundred games
+      on a coin-flip sport means a fitted weight that "improves" things by .001 is
+      almost certainly noise; want months, not weeks. And this tab tests the app's
+      built-in formula. The machine-learning number shown on game cards is a
+      separate model with its own, stricter backtest — three seasons, tested on a
+      year it never trained on — and a live, public record graded against
+      sportsbook closing lines. This tab is the interactive demo of the idea; the
+      ML model is the one keeping score for real.</p>
+    </div>
+  </details>
 </div>
 
 <nav class="tabs">
-  <button id="tab-board" class="on">Board</button>
-  <button id="tab-ev">EV Calc</button>
-  <button id="tab-bt">Backtest</button>
+  <button id="tab-board" aria-pressed="true">Board</button>
+  <button id="tab-ev" aria-pressed="false">Value</button>
+  <button id="tab-bt" aria-pressed="false">Backtest</button>
 </nav>
 
 <script>
+const PARKS = {
+  147:{lat:40.8296,lon:-73.9262,roof:"open"},
+  145:{lat:41.8299,lon:-87.6338,roof:"open"},
+  117:{lat:29.7573,lon:-95.3555,roof:"retract"},
+  111:{lat:42.3467,lon:-71.0972,roof:"open"},
+  141:{lat:43.6414,lon:-79.3894,roof:"retract"},
+  144:{lat:33.8907,lon:-84.4677,roof:"open"},
+  146:{lat:25.7781,lon:-80.2197,roof:"retract"},
+  121:{lat:40.7571,lon:-73.8458,roof:"open"},
+  143:{lat:39.9061,lon:-75.1665,roof:"open"},
+  158:{lat:43.028,lon:-87.9712,roof:"retract"},
+  138:{lat:38.6226,lon:-90.1928,roof:"open"},
+  112:{lat:41.9484,lon:-87.6553,roof:"open"},
+  113:{lat:39.0975,lon:-84.5069,roof:"open"},
+  134:{lat:40.4469,lon:-80.0057,roof:"open"},
+  120:{lat:38.873,lon:-77.0074,roof:"open"},
+  110:{lat:39.2839,lon:-76.6217,roof:"open"},
+  139:{lat:27.7683,lon:-82.6534,roof:"dome"},
+  118:{lat:39.0517,lon:-94.4803,roof:"open"},
+  114:{lat:41.4962,lon:-81.6852,roof:"open"},
+  116:{lat:42.339,lon:-83.0485,roof:"open"},
+  142:{lat:44.9817,lon:-93.2776,roof:"open"},
+  133:{lat:38.58,lon:-121.513,roof:"open"},
+  108:{lat:33.8003,lon:-117.8827,roof:"open"},
+  136:{lat:47.5914,lon:-122.3325,roof:"retract"},
+  140:{lat:32.7473,lon:-97.0842,roof:"retract"},
+  137:{lat:37.7786,lon:-122.3893,roof:"open"},
+  119:{lat:34.0739,lon:-118.24,roof:"open"},
+  135:{lat:32.7073,lon:-117.1566,roof:"open"},
+  109:{lat:33.4455,lon:-112.0667,roof:"retract"},
+  115:{lat:39.7559,lon:-104.9942,roof:"open"},
+};
+
+const TEAMS = {
+  147:{ab:"NYY",name:"Yankees",c:"#0C2340",lt:"#8FA8C8"},
+  145:{ab:"CWS",name:"White Sox",c:"#27251F",lt:"#C4CED4"},
+  117:{ab:"HOU",name:"Astros",c:"#EB6E1F",lt:"#F4B183"},
+  111:{ab:"BOS",name:"Red Sox",c:"#BD3039",lt:"#E8A0A5"},
+  141:{ab:"TOR",name:"Blue Jays",c:"#134A8E",lt:"#8FB4E3"},
+  144:{ab:"ATL",name:"Braves",c:"#CE1141",lt:"#E88B9A"},
+  146:{ab:"MIA",name:"Marlins",c:"#00A3E0",lt:"#7FD4F0"},
+  121:{ab:"NYM",name:"Mets",c:"#002D72",lt:"#7F9BC8"},
+  143:{ab:"PHI",name:"Phillies",c:"#E81828",lt:"#F28B94"},
+  158:{ab:"MIL",name:"Brewers",c:"#12284B",lt:"#8595AE"},
+  138:{ab:"STL",name:"Cardinals",c:"#C41E3A",lt:"#E58B9A"},
+  112:{ab:"CHC",name:"Cubs",c:"#0E3386",lt:"#8399C8"},
+  113:{ab:"CIN",name:"Reds",c:"#C6011F",lt:"#E5808F"},
+  134:{ab:"PIT",name:"Pirates",c:"#FDB827",lt:"#FED97F"},
+  120:{ab:"WSH",name:"Nationals",c:"#AB0003",lt:"#DB8082"},
+  110:{ab:"BAL",name:"Orioles",c:"#DF4601",lt:"#F0A07F"},
+  139:{ab:"TB",name:"Rays",c:"#092C5C",lt:"#8496AE"},
+  118:{ab:"KC",name:"Royals",c:"#004687",lt:"#7FA3C3"},
+  114:{ab:"CLE",name:"Guardians",c:"#00385D",lt:"#7F9CAE"},
+  116:{ab:"DET",name:"Tigers",c:"#0C2340",lt:"#8FA8C8"},
+  142:{ab:"MIN",name:"Twins",c:"#002B5C",lt:"#7F95AE"},
+  133:{ab:"ATH",name:"Athletics",c:"#003831",lt:"#7F9C97"},
+  108:{ab:"LAA",name:"Angels",c:"#BA0021",lt:"#DC8090"},
+  136:{ab:"SEA",name:"Mariners",c:"#0C2C56",lt:"#8496AE"},
+  140:{ab:"TEX",name:"Rangers",c:"#003278",lt:"#7F94C3"},
+  137:{ab:"SF",name:"Giants",c:"#FD5A1E",lt:"#FEAC8F"},
+  119:{ab:"LAD",name:"Dodgers",c:"#005A9C",lt:"#7FADCE"},
+  135:{ab:"SD",name:"Padres",c:"#2F241D",lt:"#C4B5A5"},
+  109:{ab:"ARI",name:"D-backs",c:"#A71930",lt:"#D38C97"},
+  115:{ab:"COL",name:"Rockies",c:"#333366",lt:"#9999B3"},
+};
+
+
 const API = "https://statsapi.mlb.com/api/v1";
 /* Optional: URL of nightly ML predictions (predictions.json from slate-lab).
    Example: "https://<user>.github.io/<repo>/predictions.json". Empty = off. */
@@ -386,15 +532,33 @@ async function pool(items, limit, fn) {
 }
 
 /* ---------- tabs ---------- */
-const VIEWS = ["board","ev","bt"];
-function show(which) {
+const VIEWS = ["home","board","ev","bt"];
+const HASHES = { home:"#home", board:"#mlb", ev:"#mlb/value", bt:"#mlb/backtest" };
+function show(which, pushHash) {
   VIEWS.forEach(v => {
     document.getElementById("view-"+v).classList.toggle("hide", which !== v);
-    document.getElementById("tab-"+v).classList.toggle("on", which === v);
+    const tab = document.getElementById("tab-"+v);
+    if (tab) tab.setAttribute("aria-pressed", String(which === v));
   });
+  document.querySelector(".tabs").classList.toggle("hide", which === "home");
+  if (pushHash !== false && HASHES[which] && location.hash !== HASHES[which]) {
+    history.pushState(null, "", HASHES[which]);
+  }
   window.scrollTo(0,0);
 }
-VIEWS.forEach(v => { document.getElementById("tab-"+v).onclick = () => show(v); });
+["board","ev","bt"].forEach(v => { document.getElementById("tab-"+v).onclick = () => show(v); });
+document.getElementById("go-mlb").onclick = () => show("board");
+document.getElementById("toHome").onclick = () => show("home");
+function route() {
+  const h = location.hash;
+  if (h.startsWith("#mlb/value")) show("ev", false);
+  else if (h.startsWith("#mlb/backtest")) show("bt", false);
+  else if (h.startsWith("#mlb")) show("board", false);
+  else show("home", false);
+}
+window.addEventListener("popstate", route);
+window.addEventListener("hashchange", route);
+route();
 
 /* ================= BOARD ================= */
 const M = {
@@ -403,7 +567,7 @@ const M = {
   PROB_FLOOR:0.15, PROB_CEIL:0.85
 };
 let date = etToday();
-let S = { games:[], team:{}, pitch:{}, splits:{}, pen:{}, lgEra:null, lgOps:{} };
+let S = { games:[], team:{}, pitch:{}, splits:{}, pen:{}, regulars:{}, lgEra:null, lgOps:{} };
 const setPhase = t => { document.getElementById("phase").textContent = t || ""; };
 
 function log5(pa,pb){ const den = pa+pb-2*pa*pb; return den===0 ? 0.5 : (pa-pa*pb)/den; }
@@ -445,81 +609,262 @@ function modelGame(g) {
            partial: !(spA && spB) || spA?.unknown || spB?.unknown };
 }
 
+
+/* ---------- sorting ---------- */
+let sortMode = "time";
+function sortedGames() {
+  const g = [...S.games];
+  if (sortMode === "edge") {
+    const score = x => {
+      const m = modelGame(x);
+      if (!m) return -1;
+      const ml = MLP[x.gamePk];
+      // when the ML model is published, rank by disagreement between the two;
+      // otherwise rank by how far the model strays from a coin flip
+      return ml != null ? Math.abs(ml - m.pAway) + 0.5 : Math.abs(m.pAway - 0.5);
+    };
+    g.sort((a,b) => score(b) - score(a));
+  } else {
+    g.sort((a,b) => new Date(a.gameDate) - new Date(b.gameDate));
+  }
+  return g;
+}
+
+function liveInning(g) {
+  const ls = g.linescore || {};
+  const st = g.status?.detailedState || "In Progress";
+  // finished / suspended / delayed states: show the words, not an inning
+  if (/final|game over|completed/i.test(g.status?.abstractGameState + st)) return esc(st);
+  if (/delay|postpon|suspend|warmup|pre-game/i.test(st)) return esc(st);
+  const n = ls.currentInning;
+  if (!n) return esc(st);
+  const stateRaw = (ls.inningState || ls.inningHalf || "").toLowerCase();
+  const half =
+    stateRaw.startsWith("top")    ? "Top" :
+    stateRaw.startsWith("bottom") ? "Bot" :
+    stateRaw.startsWith("mid")    ? "Mid" :
+    stateRaw.startsWith("end")    ? "End" :
+    (ls.isTopInning === true ? "Top" : ls.isTopInning === false ? "Bot" : "");
+  const ord = half ? half + " " + n : "Inning " + n;
+  // outs, when mid at-bat and provided
+  const outs = (half === "Top" || half === "Bot") && ls.outs
+    ? " \u00b7 " + ls.outs + " out" + (ls.outs === 1 ? "" : "s") : "";
+  return ord + outs;
+}
+
+
+/* ---------- weather (open-meteo, free, no key) ---------- */
+const WX = {};   // gamePk -> {temp, wind, dir, code, dome} | null
+function windArrow(deg){
+  const dirs=["N","NE","E","SE","S","SW","W","NW"];
+  return dirs[Math.round(((deg%360)/45))%8];
+}
+function wxCodeText(c){
+  if(c==null) return "";
+  if(c===0) return "clear";
+  if(c<=2) return "partly cloudy";
+  if(c===3) return "overcast";
+  if(c<=48) return "fog";
+  if(c<=67) return "rain";
+  if(c<=77) return "snow";
+  if(c<=82) return "showers";
+  if(c<=99) return "storms";
+  return "";
+}
+async function loadWeather(){
+  const jobs = S.games.map(async g => {
+    const hId = g.teams?.home?.team?.id;
+    const park = PARKS[hId];
+    if(!park){ WX[g.gamePk]=null; return; }
+    if(park.roof==="dome"){ WX[g.gamePk]={dome:true,roof:"dome"}; return; }
+    try{
+      const t = new Date(g.gameDate);
+      const day = t.toISOString().slice(0,10);
+      const url = "https://api.open-meteo.com/v1/forecast?latitude="+park.lat
+        +"&longitude="+park.lon+"&hourly=temperature_2m,weather_code,wind_speed_10m,wind_direction_10m"
+        +"&temperature_unit=fahrenheit&wind_speed_unit=mph&start_date="+day+"&end_date="+day+"&timezone=UTC";
+      const r = await fetch(url);
+      if(!r.ok){ WX[g.gamePk]=null; return; }
+      const d = await r.json();
+      const hrs = d.hourly?.time||[];
+      let idx = hrs.findIndex(h => new Date(h+"Z") >= t);
+      if(idx<0) idx = hrs.length-1;
+      WX[g.gamePk] = {
+        temp: Math.round(d.hourly.temperature_2m[idx]),
+        wind: Math.round(d.hourly.wind_speed_10m[idx]),
+        dir: windArrow(d.hourly.wind_direction_10m[idx]),
+        code: d.hourly.weather_code[idx],
+        roof: park.roof,
+      };
+    }catch(e){ WX[g.gamePk]=null; }
+  });
+  await Promise.all(jobs);
+}
+
+/* ---------- render ---------- */
+function findScratches(teamId, lineup){
+  const regs = S.regulars?.[teamId] || [];
+  if (!regs.length || !lineup.length) return [];
+  const inIds = new Set(lineup.map(p => p.id));
+  return regs.filter(r => !inIds.has(r.id)).map(r => r.name).slice(0,3);
+}
+
+function wxLine(g){
+  const w = WX[g.gamePk];
+  if(!w) return "";
+  if(w.dome) return '<div class="wx"><span class="wx-dome">\u25C9 Dome \u00b7 no weather factor</span></div>';
+  const roofNote = w.roof==="retract" ? ' \u00b7 roof may be closed' : '';
+  const cond = wxCodeText(w.code);
+  const rain = (w.code>=51) ? ' wx-alert' : '';
+  return '<div class="wx'+rain+'">'
+    + '<span>\u{1F321} '+w.temp+'\u00b0</span>'
+    + '<span>\u{1F4A8} '+w.wind+' mph '+w.dir+'</span>'
+    + (cond ? '<span>'+cond+'</span>' : '')
+    + (roofNote ? '<span class="wx-note">'+roofNote.replace(' \u00b7 ','')+'</span>' : '')
+    + '</div>';
+}
+
+
 function render() {
   const board = document.getElementById("board");
   if (!S.games.length) {
-    board.innerHTML = '<div class="msg"><h3>No games scheduled</h3>Nothing on the calendar for this date.</div>';
+    board.innerHTML = '<div class="note"><h3>No games</h3>Nothing scheduled for this date.</div>';
     return;
   }
-  board.innerHTML = S.games.map(g => {
-    const live = g.status?.abstractGameState !== "Preview";
-    const head = '<div class="game-head"><span>'
-      + (live ? '<span class="final">'+esc(g.status?.detailedState)+'</span>' : esc(clock(g.gameDate)))
-      + (g.doubleHeader!=="N" ? '<span class="dh">DH · GM '+g.gameNumber+'</span>' : '')
-      + '</span><span class="venue">'+esc(g.venue?.name)+'</span></div>';
 
-    const sides = ["away","home"].map(k => {
-      const other = k==="away" ? "home" : "away";
-      const t=g.teams?.[k], id=t?.team?.id, i=S.team[id]||{};
-      const pp=t?.probablePitcher, ps=pp?S.pitch[pp.id]:null, pen=S.pen[id];
-      const oppId=g.teams?.[other]?.team?.id, hand=ps?.hand;
-      const oppSplit = (hand && S.splits[oppId]) ? S.splits[oppId][hand] : null;
+  const T = id => TEAMS[id] || {ab:"?",name:"",c:"#33445A",lt:"#9FB4CE"};
+  const lastName = p => esc((p?.fullName || p?.lastName || "").split(" ").slice(-1)[0]);
 
-      const meta=[];
-      if (i.rd!=null) meta.push('<span class="rd '+(i.rd>=0?"pos":"neg")+'">'+(i.rd>=0?"+":"")+i.rd+' RD</span>');
-      if (i.pyth) meta.push('<span>PYTH '+esc(i.pyth)+'</span>');
-      if (pen) meta.push('<span class="pen'+(pen.tired>=3?" tired":"")+'">PEN L3 '+pen.pitches+'P'
-        +(pen.tired?' · '+pen.tired+' arms 2+d':'')+'</span>');
-
-      let ph = '<div class="tbd">Starter TBD</div>';
-      if (pp) {
-        ph = '<div class="pitcher"><span class="nm">'+esc(pp.fullName)+'</span>'
-          + (ps?.hand ? '<span class="hand">'+esc(ps.hand)+'HP</span>' : '')
-          + (ps && ps.era!=null ? '<div class="pline"><span class="era">'+esc(ps.era)+' ERA</span>'
-              + '<span>'+esc(ps.w)+'-'+esc(ps.l)+'</span><span>'+esc(ps.ip)+' IP</span>'
-              + '<span>'+esc(ps.so)+' K</span>'
-              + (ps.whip?'<span>'+esc(ps.whip)+' WHIP</span>':'')+'</div>' : '')
-          + (ps && ps.l5 ? '<div class="l5">Last '+ps.l5.n+' starts · <b>'+ps.l5.era+' ERA</b> · '+ps.l5.ip+' IP</div>' : '')
-          + (oppSplit && oppSplit.ops ? '<div class="split">Opp lineup vs '+esc(hand)+'HP · <b>'+esc(oppSplit.ops)+' OPS</b></div>' : '')
-          + '</div>';
-      }
-      return '<div class="side"><div><div class="team-line">'
-        + '<span class="abbr">'+esc(t?.team?.abbreviation)+'</span>'
-        + '<span class="rec">'+(i.w!=null?i.w+"-"+i.l:"—")+'</span>'
-        + (i.l10?'<span class="l10">L10 <b>'+esc(i.l10)+'</b></span>':'')
-        + (i.strk?'<span class="strk '+(i.strk[0]==="W"?"w":"l")+'">'+esc(i.strk)+'</span>':'')
-        + '</div>'
-        + (meta.length?'<div class="teammeta">'+meta.join("")+'</div>':'')
-        + ph + '</div><div class="score">'+(live && t?.score!=null ? t.score : "")+'</div></div>';
-    }).join("");
-
-    let mh = "";
+  board.innerHTML = sortedGames().map(g => {
+    const live = g.status?.abstractGameState === "Live";
+    const final = g.status?.abstractGameState === "Final";
+    const A = g.teams?.away, H = g.teams?.home;
+    const aId = A?.team?.id, hId = H?.team?.id;
+    const ta = T(aId), th = T(hId);
+    const ia = S.team[aId] || {}, ih = S.team[hId] || {};
+    const pa = A?.probablePitcher, ph = H?.probablePitcher;
+    const sa = pa ? S.pitch[pa.id] : null, sh = ph ? S.pitch[ph.id] : null;
     const m = modelGame(g);
-    if (m) {
-      const aAb=esc(g.teams?.away?.team?.abbreviation), hAb=esc(g.teams?.home?.team?.abbreviation);
-      const aP=(m.pAway*100).toFixed(1), hP=(m.pHome*100).toFixed(1);
-      const awayFav = m.pAway >= m.pHome;
-      const sg = v => (v>=0?"+":"−")+Math.abs(v).toFixed(2);
-      mh = '<div class="model"><div class="model-top">'
-        + '<span class="model-lab">Model'+(m.partial?' · partial':'')+'</span>'
-        + '<span class="model-nums"><span class="'+(awayFav?"fav":"")+'">'+aAb+' '+aP+'% ('+probToML(m.pAway)+')</span>'
-        + '<span class="sep">vs</span><span class="'+(!awayFav?"fav":"")+'">'+hAb+' '+hP+'% ('+probToML(m.pHome)+')</span></span></div>'
-        + '<div class="bar"><div class="a" style="width:'+aP+'%"></div><div class="b" style="width:'+hP+'%"></div></div>'
-        + '<div class="parts"><span>base '+(m.base*100).toFixed(1)+'% '+aAb+'</span>'
-        + '<span>home field −3.9pt</span>'
-        + '<span class="'+(m.spRuns>=0?"up":"dn")+'">starters '+sg(m.spRuns)+' R</span>'
-        + '<span class="'+(m.offRuns>=0?"up":"dn")+'">bats '+sg(m.offRuns)+' R</span>'
-        + (MLP[g.gamePk]!=null ? '<span style="color:var(--heat)">ML '+(MLP[g.gamePk]*100).toFixed(1)+'% '+aAb+'</span>' : '') + '<button class="toev" data-a="'+aAb+'" data-h="'+hAb+'" data-p="'+aP+'">→ EV</button>'
-        + '</div></div>';
+    const ml = MLP[g.gamePk];
+    const luA = g.lineups?.awayPlayers || [], luH = g.lineups?.homePlayers || [];
+    const luPosted = luA.length >= 9 && luH.length >= 9;
+    const scratches = luPosted ? [
+      ...findScratches(aId, luA).map(n => ({t:T(aId).ab, n})),
+      ...findScratches(hId, luH).map(n => ({t:T(hId).ab, n})),
+    ] : [];
+
+    // header right side: live state / value badge / lineups flag
+    let right = "";
+    if (live) {
+      right = '<span class="g-live"><span class="dot">●</span> ' + esc(liveInning(g)) + '</span>';
+    } else if (final) {
+      right = '<span class="g-when">Final</span>';
+    } else if (m && ml != null) {
+      const gap = (ml - m.pAway) * 100;
+      if (Math.abs(gap) >= 2.5) {
+        const side = gap > 0 ? ta.ab : th.ab;
+        right = '<span class="g-badge">VALUE · ' + side + '</span>';
+      }
     }
-    return '<div class="game">'+head+sides+mh+'</div>';
+    if (scratches.length && !live && !final) {
+      right = '<span class="g-badge" style="background:var(--amber)">SCRATCH \u00b7 '+scratches[0].n.toUpperCase()+'</span>';
+    } else if (!right && luPosted && !live && !final) {
+      right = '<span class="g-badge" style="background:var(--ink-2)">LINEUPS IN</span>';
+    }
+
+    const pctA = m ? (m.pAway*100).toFixed(0) : null;
+    const pctH = m ? (m.pHome*100).toFixed(0) : null;
+    const awayWin = !m || m.pAway >= m.pHome;
+
+    const chip = t => '<div class="t-chip" style="background:'+t.c+';color:'+t.lt+'">'+t.ab+'</div>';
+
+    const teamRow = (t, tinfo, inf, pct, isWin, score, dim) =>
+      '<div class="t-row'+(dim?' dim':'')+'">'
+      + '<div class="t-left">'+chip(tinfo)
+      + '<span class="t-name">'+esc(tinfo.name || t?.team?.abbreviation)+'</span>'
+      + (inf.w!=null ? '<span class="t-rec">'+inf.w+'-'+inf.l+'</span>' : '')
+      + '</div>'
+      + ((live||final) && score!=null
+          ? '<span class="score">'+score+'</span>'
+          : (pct!=null ? '<span class="pct '+(isWin?'win':'lose')+'">'+pct+'%</span>' : ''))
+      + '</div>';
+
+    const rowA = teamRow(A, ta, ia, pctA, awayWin, A?.score, !awayWin && !(live||final) ? false : !awayWin);
+    const rowH = teamRow(H, th, ih, pctH, !awayWin, H?.score, awayWin && !(live||final) ? false : awayWin);
+    const rows = awayWin ? rowA + rowH : rowA + rowH;
+
+    // starters line
+    const arm = (p,s) => p
+      ? '<b>'+lastName(p)+'</b> '+(s&&s.era!=null?esc(s.era):'—')
+      : '<span class="tbd">TBD</span>';
+    const arms = (live||final) ? '' :
+      '<div class="arms">'+arm(pa,sa)+arm(ph,sh).replace('<b>','<span style="margin-left:auto"></span><b>')+'</div>';
+    const armsFixed = (live||final) ? '' :
+      '<div class="arms"><span>'+arm(pa,sa)+'</span><span>'+arm(ph,sh)+'</span></div>';
+
+    // details
+    const streakWord = s => !s ? "—" : (s[0]==="W" ? "won "+s.slice(1)+" straight" : "lost "+s.slice(1)+" straight");
+    const dash = v => (v==null||v==="") ? "—" : v;
+    const line = (label,av,hv) => '<tr><td>'+label+'</td><td class="num">'+av+'</td><td class="num">'+hv+'</td></tr>';
+    const pen = t => { const p=S.pen[t]; return p ? p.pitches+'P'+(p.tired?' / '+p.tired+' tired':'') : '—'; };
+    const penOut = t => { const p=S.pen[t];
+      return p && p.unavailable && p.unavailable.length
+        ? p.unavailable.slice(0,3).join(', ') : '—'; };
+    const spl = (teamId,hand) => { const s=hand&&S.splits[teamId]?S.splits[teamId][hand]:null; return s&&s.ops?esc(s.ops):'—'; };
+
+    const det =
+      '<div class="det"><table>'
+      + '<tr><th>Team form</th><th style="text-align:right">'+ta.ab+'</th><th style="text-align:right">'+th.ab+'</th></tr>'
+      + line("Season record", dash(ia.w!=null?ia.w+"-"+ia.l:null), dash(ih.w!=null?ih.w+"-"+ih.l:null))
+      + line("Last 10 games", dash(ia.l10), dash(ih.l10))
+      + line("Current streak", streakWord(ia.strk), streakWord(ih.strk))
+      + line("Runs scored minus allowed", ia.rd!=null?(ia.rd>=0?"+":"")+ia.rd:"—", ih.rd!=null?(ih.rd>=0?"+":"")+ih.rd:"—")
+      + line("Record their runs suggest", dash(ia.pyth), dash(ih.pyth))
+      + line("Relief pitches, last 3 days", pen(aId), pen(hId))
+      + line("Pen arms likely down tonight", penOut(aId), penOut(hId))
+      + '<tr><th style="padding-top:12px">Tonight\u2019s starters</th><th></th><th></th></tr>'
+      + line("ERA this season", sa&&sa.era!=null?esc(sa.era):"—", sh&&sh.era!=null?esc(sh.era):"—")
+      + line("K-BB% \u2014 what the model uses", 
+             sa&&sa.kbb!=null?sa.kbb.toFixed(1)+"%":"—",
+             sh&&sh.kbb!=null?sh.kbb.toFixed(1)+"%":"—")
+      + line("ERA, last 5 starts", sa&&sa.l5?sa.l5.era:"—", sh&&sh.l5?sh.l5.era:"—")
+      + line("Runners allowed per inning", sa&&sa.whip?esc(sa.whip):"—", sh&&sh.whip?esc(sh.whip):"—")
+      + line("Opponent hitting vs this arm", spl(aId,sh?.hand), spl(hId,sa?.hand))
+      + '</table>'
+      + (luPosted
+          ? '<p class="lu-h">Confirmed lineups</p><div class="lu"><div><b>'+ta.ab+'</b>'
+            + luA.slice(0,9).map((p,i)=>'<span>'+(i+1)+'. '+lastName(p)+(p.primaryPosition?.abbreviation?' <i>'+esc(p.primaryPosition.abbreviation)+'</i>':'')+'</span>').join('')
+            + '</div><div><b>'+th.ab+'</b>'
+            + luH.slice(0,9).map((p,i)=>'<span>'+(i+1)+'. '+lastName(p)+(p.primaryPosition?.abbreviation?' <i>'+esc(p.primaryPosition.abbreviation)+'</i>':'')+'</span>').join('')
+            + '</div></div>'
+          : '<p class="lu-h muted">Lineups not posted yet \u2014 usually 2\u20134 hours before first pitch.</p>')
+      + (m ? '<p class="why">Team records give the road side '+(m.base*100).toFixed(0)+'%; playing away costs ~4 points; the pitching matchup '
+           + (Math.abs(m.spRuns)<0.05?'is roughly even':'shifts it toward '+(m.spRuns>0?ta.ab:th.ab)+' by ~'+Math.abs(m.spRuns).toFixed(1)+' runs')+'.'
+           + (ml!=null?' The ML model reads it '+(ml*100).toFixed(0)+'% for '+ta.ab+'.':'')+'</p>' : '')
+      + '</div>';
+
+    return '<article class="game'+(right.includes('VALUE')?' value':'')+'">'
+      + '<div class="g-head"><span class="g-when">'
+        + ((live||final) ? '' : esc(clock(g.gameDate))+' ')
+        + '</span>' + (right || '<span></span>')
+        + '<span class="g-venue">'+esc(g.venue?.name||"")+'</span></div>'
+      + rows + armsFixed + wxLine(g)
+      + (scratches.length
+          ? '<div class="scratch">\u26A0 Sitting tonight: '
+            + scratches.map(s=>s.t+' '+s.n).join(', ')
+            + ' <span class="wx-note">(started 2 of last 3)</span></div>' : '')
+      + (m && !live && !final ? '<button class="tovalue" data-a="'+ta.ab+'" data-h="'+th.ab+'" data-p="'+(m.pAway*100).toFixed(0)+'">Check the value \u2192</button>' : '')
+      + '<details class="d"><summary>Details</summary>'+det+'</details>'
+      + '</article>';
   }).join("");
 
-  board.querySelectorAll(".toev").forEach(btn => {
+  board.querySelectorAll(".tovalue").forEach(btn => {
     btn.onclick = () => {
       document.getElementById("nameA").value = btn.dataset.a;
       document.getElementById("nameB").value = btn.dataset.h;
-      document.getElementById("estA").value = Math.round(Number(btn.dataset.p));
+      EV_EST = Number(btn.dataset.p);
+      EV_NOTE = "The model makes " + btn.dataset.a + " a " + btn.dataset.p
+        + "% favorite in this game. Enter the sportsbook's two prices to see whether that gap is worth money.";
       show("ev"); drawEV();
     };
   });
@@ -528,7 +873,7 @@ function render() {
 async function loadCore() {
   const season = date.slice(0,4);
   const [sched, stand] = await Promise.all([
-    jget(API+"/schedule?sportId=1&date="+date+"&hydrate=team,probablePitcher,linescore"),
+    jget(API+"/schedule?sportId=1&date="+date+"&hydrate=team,probablePitcher,linescore,lineups"),
     jget(API+"/standings?leagueId=103,104&season="+season+"&standingsTypes=regularSeason")
   ]);
   const team = {};
@@ -551,7 +896,7 @@ async function loadCore() {
   S.games = (sched.dates||[]).flatMap(d=>d.games||[])
     .sort((a,b)=>new Date(a.gameDate)-new Date(b.gameDate));
   document.getElementById("sub").textContent =
-    S.games.length+" game"+(S.games.length===1?"":"s")+" · times Eastern";
+    pretty(date)+" · "+S.games.length+" game"+(S.games.length===1?"":"s");
   render();
 }
 
@@ -579,7 +924,11 @@ async function loadPitchers() {
       }
     }
     map[p.id] = { hand:p.pitchHand?.code||"", era:st?.era, w:st?.wins, l:st?.losses,
-                  ip:st?.inningsPitched, so:st?.strikeOuts, whip:st?.whip, l5 };
+                  ip:st?.inningsPitched, so:st?.strikeOuts, whip:st?.whip, l5,
+                  kbb:(st && st.battersFaced>0
+                        ? (((Number(st.strikeOuts)||0)-(Number(st.baseOnBalls)||0))
+                           / Number(st.battersFaced) * 100)
+                        : null) };
   });
   S.pitch = map; render();
 }
@@ -620,33 +969,60 @@ async function loadBullpen() {
   if (!relevant.length) return;
   const boxes = await pool(relevant, 6, async ref => ({
     box: await jget(API+"/game/"+ref.pk+"/boxscore"), day: ref.day }));
-  const usage={};
+  const usage={}, reg={};
+  const yesterday = shift(date,-1);
   boxes.filter(Boolean).forEach(e => ["away","home"].forEach(side => {
     const tm=e.box.teams?.[side], tid=tm?.team?.id;
     if (!tid || !todayTeams.has(tid)) return;
     usage[tid]=usage[tid]||{ pitches:0, arms:{} };
+    reg[tid]=reg[tid]||{ games:new Set(), starters:{} };
+    reg[tid].games.add(e.day);
     (tm.pitchers||[]).slice(1).forEach(pid => {
       const pl=tm.players?.["ID"+pid];
-      usage[tid].pitches += Number(pl?.stats?.pitching?.numberOfPitches
-                                ?? pl?.stats?.pitching?.pitchesThrown ?? 0);
-      usage[tid].arms[pid]=usage[tid].arms[pid]||new Set();
-      usage[tid].arms[pid].add(e.day);
+      const n = Number(pl?.stats?.pitching?.numberOfPitches
+                    ?? pl?.stats?.pitching?.pitchesThrown ?? 0);
+      usage[tid].pitches += n;
+      const a = usage[tid].arms[pid]=usage[tid].arms[pid]||
+        { name:(pl?.person?.fullName||"").split(" ").slice(-1)[0], days:new Set(), yPitches:0 };
+      a.days.add(e.day);
+      if (e.day===yesterday) a.yPitches += n;
+    });
+    Object.values(tm.players||{}).forEach(pl => {
+      const bo = pl?.battingOrder;
+      if (bo != null && Number(bo) % 100 === 0) {
+        const s = reg[tid].starters[pl.person?.id] = reg[tid].starters[pl.person?.id]
+          || { name:(pl.person?.fullName||"").split(" ").slice(-1)[0], n:0 };
+        s.n += 1;
+      }
     });
   }));
   const pen={};
   Object.keys(usage).forEach(tid => { const u=usage[tid];
-    pen[tid]={ pitches:u.pitches, tired:Object.values(u.arms).filter(d=>d.size>=2).length }; });
-  S.pen = pen; render();
+    const unavailable = Object.values(u.arms)
+      .filter(a => a.days.size>=2 || a.yPitches>=25)
+      .map(a => a.name).filter(Boolean);
+    pen[tid]={ pitches:u.pitches,
+               tired:Object.values(u.arms).filter(a=>a.days.size>=2).length,
+               unavailable }; });
+  S.pen = pen;
+  const regulars={};
+  Object.keys(reg).forEach(tid => {
+    const need = Math.min(2, reg[tid].games.size);
+    regulars[tid] = Object.entries(reg[tid].starters)
+      .filter(([,s]) => s.n >= need)
+      .map(([id,s]) => ({ id:Number(id), name:s.name }));
+  });
+  S.regulars = regulars;
+  render();
 }
 
 async function load() {
   S = { games:[], team:{}, pitch:{}, splits:{}, pen:{}, lgEra:null, lgOps:{} };
-  document.getElementById("title").textContent = pretty(date);
   document.getElementById("sub").textContent = "Pulling the board…";
   document.getElementById("board").innerHTML = '<div class="msg">Loading schedule and standings…</div>';
-  const tb = document.getElementById("todayBtn");
-  tb.innerHTML = date===etToday() ? '<span class="today-chip">TODAY</span>'
-    : '<button class="ghost" id="goToday">Today</button>';
+  const tb = document.getElementById("todaySlot");
+  tb.innerHTML = date===etToday() ? '<span class="today">TODAY</span>'
+    : '<button id="goToday">Today</button>';
   const gt = document.getElementById("goToday");
   if (gt) gt.onclick = () => { date = etToday(); load(); };
   try { setPhase("LOADING SCHEDULE + STANDINGS"); await loadCore(); }
@@ -666,12 +1042,16 @@ async function load() {
   setPhase("ADDING STARTER LINES…");            await loadPitchers().catch(()=>{});
   setPhase("ADDING SPLITS + LEAGUE BASELINES…"); await loadSplits().catch(()=>{});
   setPhase("ADDING BULLPEN USAGE…");             await loadBullpen().catch(()=>{});
+  setPhase("CHECKING BALLPARK WEATHER…");        await loadWeather().catch(()=>{}); render();
   setPhase("");
 }
 document.getElementById("prev").onclick = () => { date=shift(date,-1); load(); };
 document.getElementById("next").onclick = () => { date=shift(date, 1); load(); };
 
 /* ================= EV CALCULATOR ================= */
+let EV_EST = 60;      // slider value, settable by the board's Check-value button
+let EV_NOTE = "";     // one-line context shown when arriving from a game
+
 const validML = n => Number.isFinite(n) && (n>=100 || n<=-100);
 const mlProb  = ml => ml>0 ? 100/(ml+100) : Math.abs(ml)/(Math.abs(ml)+100);
 const mlDec   = ml => ml>0 ? 1+ml/100 : 1+100/Math.abs(ml);
@@ -681,87 +1061,110 @@ function drawEV() {
   const mlB = parseInt(document.getElementById("mlB").value,10);
   const okA = validML(mlA), okB = validML(mlB);
   document.getElementById("hintA").textContent =
-    document.getElementById("mlA").value && !okA ? "Use −100 or lower, +100 or higher" : "";
+    document.getElementById("mlA").value && !okA ? "Use -100 or lower, +100 or higher" : "";
   document.getElementById("hintB").textContent =
-    document.getElementById("mlB").value && !okB ? "Use −100 or lower, +100 or higher" : "";
-  document.getElementById("mlA").classList.toggle("bad-input", !!document.getElementById("mlA").value && !okA);
-  document.getElementById("mlB").classList.toggle("bad-input", !!document.getElementById("mlB").value && !okB);
+    document.getElementById("mlB").value && !okB ? "Use -100 or lower, +100 or higher" : "";
+  document.getElementById("mlA").classList.toggle("bad", !!document.getElementById("mlA").value && !okA);
+  document.getElementById("mlB").classList.toggle("bad", !!document.getElementById("mlB").value && !okB);
 
   const body = document.getElementById("evBody");
   const nameA = document.getElementById("nameA").value || "Side A";
   const nameB = document.getElementById("nameB").value || "Side B";
 
   if (!(okA && okB)) {
-    body.innerHTML = '<div class="card"><p class="msg">Enter two valid moneylines to see the breakdown.</p></div>';
+    body.innerHTML = '<div class="note">Enter both moneylines above \u2014 for example \u2212150 and +130 \u2014 and the answer appears here.</div>';
     return;
   }
 
-  const rA=mlProb(mlA), rB=mlProb(mlB), over=rA+rB, vig=over-1;
-  const fA=rA/over, fB=rB/over, decA=mlDec(mlA), decB=mlDec(mlB);
+  const rA = mlProb(mlA), rB = mlProb(mlB);
+  const over = rA + rB, vig = over - 1;
+  const fA = rA / over, fB = rB / over;
+  const decA = mlDec(mlA), decB = mlDec(mlB);
 
-  const prev = document.getElementById("estA");
-  const estA = prev ? Number(prev.value) : 60;
-  const pA = clamp(estA/100, 0.01, 0.99), pB = 1-pA;
-  const calc = (p,dec,fair) => { const b=dec-1, ev=p*b-(1-p);
+  const pA = clamp(EV_EST/100, 0.01, 0.99), pB = 1 - pA;
+  const calc = (p,dec,fair) => { const b = dec-1, ev = p*b-(1-p);
     return { edge:p-fair, ev, ev100:ev*100, kelly:Math.max(b>0?(p*b-(1-p))/b:0,0) }; };
   const A = calc(pA,decA,fA), B = calc(pB,decB,fB);
-  const best = A.ev>=B.ev ? {k:"A",n:nameA,p:pA,fair:fA,...A} : {k:"B",n:nameB,p:pB,fair:fB,...B};
-  const hasEdge = best.ev>0;
+  const best = A.ev >= B.ev
+    ? { k:"A", n:nameA, p:pA, fair:fA, ...A }
+    : { k:"B", n:nameB, p:pB, fair:fB, ...B };
+  const hasEdge = best.ev > 0;
+  const thin = hasEdge && best.ev100 < 5;
+
+  /* ---- tier 1: the answer ---- */
+  let answer;
+  if (thin) {
+    answer =
+      '<p class="ans-word">Too thin to bet</p>'
+      + '<p class="ans-sub">A $100 bet on '+esc(best.n)+' averages about $'+best.ev100.toFixed(2)
+      + ' \u2014 smaller than the error in any estimate. Treat it as no edge.</p>';
+  } else if (hasEdge) {
+    answer =
+      '<p class="ans-word pos">'+esc(best.n)+' has value</p>'
+      + '<p class="ans-big">+$'+best.ev100.toFixed(0)+'<span> per $100, on average</span></p>'
+      + '<p class="ans-sub">That average only holds if your '+(best.p*100).toFixed(0)
+      + '% estimate is right \u2014 and any single game can still lose.</p>';
+  } else {
+    answer =
+      '<p class="ans-word">No value at these prices</p>'
+      + '<p class="ans-sub">Both sides lose money on average. Passing is the right move '
+      + 'most of the time \u2014 this is the normal result.</p>';
+  }
+
+  /* ---- tier 2: the estimate ---- */
+  const be = (fA*100);
+  const est = EV_EST;
+  const meter =
+    '<div class="meter"><i style="width:'+be.toFixed(1)+'%"></i>'
+    + '<b style="left:'+est+'%"></b></div>'
+    + '<div class="meter-lab"><span>Break-even '+be.toFixed(0)+'%</span>'
+    + '<span class="'+(est>be?'pos':'neg')+'">You: '+est+'%</span></div>';
+
+  /* ---- tier 3: the math, folded ---- */
+  const fmtML = p => { if (p<=0||p>=1) return "\u2014";
+    const n = p>=0.5 ? -Math.round((p/(1-p))*100) : Math.round(((1-p)/p)*100);
+    return n>0 ? "+"+n : ""+n; };
+  const money = v => (v>=0?"+$":"\u2212$")+Math.abs(v).toFixed(2);
+  const row = (l,a,b) => '<div class="stat-row"><span>'+l+'</span><span>'+a+'</span></div>'
+    .replace('</span></div>', (b!==undefined?'</span><span>'+b+'</span></div>':'</span></div>'));
+  const math =
+    '<details class="fold"><summary>Show the math</summary><div class="det" style="padding-top:12px">'
+    + '<table>'
+    + '<tr><th></th><th style="text-align:right">'+esc(nameA)+'</th><th style="text-align:right">'+esc(nameB)+'</th></tr>'
+    + '<tr><td>Price you entered</td><td class="num">'+(mlA>0?"+":"")+mlA+'</td><td class="num">'+(mlB>0?"+":"")+mlB+'</td></tr>'
+    + '<tr><td>Fair price, margin removed</td><td class="num">'+fmtML(fA)+'</td><td class="num">'+fmtML(fB)+'</td></tr>'
+    + '<tr><td>Book\u2019s implied chance</td><td class="num">'+(fA*100).toFixed(1)+'%</td><td class="num">'+(fB*100).toFixed(1)+'%</td></tr>'
+    + '<tr><td>Your estimate</td><td class="num">'+(pA*100).toFixed(0)+'%</td><td class="num">'+(pB*100).toFixed(0)+'%</td></tr>'
+    + '<tr><td>Average result per $100</td><td class="num '+(A.ev100>0?'pos':'neg')+'">'+money(A.ev100)+'</td>'
+    + '<td class="num '+(B.ev100>0?'pos':'neg')+'">'+money(B.ev100)+'</td></tr>'
+    + '<tr><td>Suggested stake (half Kelly)</td><td class="num">'+(A.kelly>0?(A.kelly*50).toFixed(1)+'%':'\u2014')+'</td>'
+    + '<td class="num">'+(B.kelly>0?(B.kelly*50).toFixed(1)+'%':'\u2014')+'</td></tr>'
+    + '</table>'
+    + '<p class="why">The book\u2019s two prices add up to '+(over*100).toFixed(1)+'% \u2014 the extra '
+    + (vig*100).toFixed(1)+'% is its cut. \u201CFair price\u201D is what each side would cost with that cut removed. '
+    + 'Half Kelly is a conservative bet size as a share of your bankroll.</p>'
+    + '</div></details>';
 
   body.innerHTML =
-    '<div class="card"><p class="card-label">Where the margin hides</p>'
-    + '<div class="barrow"><div class="barhead"><span>As posted</span>'
-    + '<span style="color:var(--heat)">'+pct(over)+' total</span></div>'
-    + '<div class="track"><div class="seg seg-a" style="width:'+(rA/over*100)+'%">'+pct(rA)+'</div>'
-    + '<div class="seg seg-b" style="width:'+(rB/over*100)+'%">'+pct(rB)+'</div>'
-    + '<div class="marker" style="left:'+(1/over*100)+'%"></div></div>'
-    + '<div style="position:relative;height:16px"><span class="mtag" style="left:'+(1/over*100)+'%">100%</span></div>'
-    + '<p style="font-size:12px;color:var(--dim);margin:6px 0 0;line-height:1.5">'
-    + 'The two prices imply '+pct(over)+' of probability. Everything past the line is the book\'s cut.</p></div>'
-    + '<div class="barrow" style="margin-bottom:0"><div class="barhead"><span>Vig removed</span>'
-    + '<span style="color:var(--truth)">100.0% fair</span></div>'
-    + '<div class="track"><div class="seg seg-a" style="width:'+(fA*100)+'%">'+pct(fA)+'</div>'
-    + '<div class="seg seg-b" style="width:'+(fB*100)+'%">'+pct(fB)+'</div></div></div>'
-    + '<dl class="readout">'
-    + '<div class="cell"><dt>Book\'s margin</dt><dd class="v-vig">'+pct(vig,2)+'</dd></div>'
-    + '<div class="cell"><dt>Fair · '+esc(nameA)+'</dt><dd class="v-truth">'+probToML(fA)+'<small>was '+(mlA>0?"+":"")+mlA+'</small></dd></div>'
-    + '<div class="cell"><dt>Fair · '+esc(nameB)+'</dt><dd class="v-truth">'+probToML(fB)+'<small>was '+(mlB>0?"+":"")+mlB+'</small></dd></div>'
-    + '</dl></div>'
-
-    + '<div class="card"><p class="card-label">Your estimate</p>'
-    + '<div style="font-size:13px;color:var(--dim);margin-bottom:4px">Chance '+esc(nameA)+' wins</div>'
-    + '<div class="slider-val">'+estA.toFixed(0)+'%<span>· '+esc(nameB)+' '+(100-estA).toFixed(0)+'%</span></div>'
-    + '<input type="range" id="estA" min="1" max="99" step="1" value="'+estA+'" />'
-    + '<div class="scale"><span>1%</span><span>50%</span><span>99%</span></div>'
-    + '<p style="font-size:12px;color:var(--dim);margin:12px 0 0;line-height:1.5">'
-    + 'Break-even sits at '+pct(fA)+' for '+esc(nameA)+'. Above that is where a bet starts to pay.</p></div>'
-
-    + '<div class="card"><p class="card-label">What a $100 bet is worth</p><div class="sides">'
-    + [[ "A",nameA,mlA,A ],[ "B",nameB,mlB,B ]].map(([k,n,ml,d]) =>
-        '<div class="sidecard'+(hasEdge && best.k===k ? " win" : "")+'">'
-        + '<p class="side-name">'+esc(n)+'</p><p class="side-ml">'+(ml>0?"+":"")+ml+'</p>'
-        + '<div class="row"><span>Edge</span><span class="'+(d.edge>0?"pos":"neg")+'">'
-          + (d.edge>0?"+":"")+pct(d.edge,2)+'</span></div>'
-        + '<div class="row"><span>EV / $100</span><span class="'+(d.ev100>0?"pos":"neg")+'">'
-          + (d.ev100>0?"+":"−")+"$"+Math.abs(d.ev100).toFixed(2)+'</span></div>'
-        + '<div class="row"><span>Kelly</span><span>'+(d.kelly>0?(d.kelly*100).toFixed(1)+"%":"—")+'</span></div>'
-        + '<div class="row"><span>Half Kelly</span><span>'+(d.kelly>0?(d.kelly*50).toFixed(1)+"%":"—")+'</span></div>'
-        + '</div>').join("")
+    (EV_NOTE ? '<p class="ev-note">'+EV_NOTE+'</p>' : '')
+    + '<div class="block"><h3>Verdict</h3>' + answer + '</div>'
+    + '<div class="block"><h3>Your estimate \u2014 chance '+esc(nameA)+' wins</h3>'
+    + '<input type="range" id="estA" min="1" max="99" step="1" value="'+est+'" aria-label="Your estimated win probability" />'
+    + meter
+    + '<p class="ans-sub" style="margin-top:10px">Anything above the break-even line is where a bet on '
+    + esc(nameA)+' starts to pay. Drag to test how sure you\u2019d need to be.</p>'
     + '</div>'
-    + '<div class="verdict '+(hasEdge?"yes":"no")+'">'
-    + (hasEdge
-        ? '<strong>'+esc(best.n)+' clears the number.</strong> Your '+pct(best.p,0)
-          +' estimate beats the fair break-even of '+pct(best.fair)+', worth <strong>$'
-          +best.ev100.toFixed(2)+'</strong> per $100 — but only if your estimate is right.'
-        : '<strong>Neither side clears.</strong> Your estimate lands inside the book\'s fair '
-          +'range, so both bets lose money over time. This is the normal result. Pass.')
-    + '</div></div>';
+    + math;
 
   const slider = document.getElementById("estA");
-  slider.oninput = drawEV;
+  slider.oninput = () => { EV_EST = Number(slider.value); drawEV(); };
 }
+
 ["nameA","nameB","mlA","mlB"].forEach(id =>
-  document.getElementById(id).addEventListener("input", drawEV));
+  document.getElementById(id).addEventListener("input", () => {
+    if (id === "nameA" || id === "nameB") EV_NOTE = "";
+    drawEV();
+  }));
 
 /* ---------- boot ---------- */
 drawEV();
@@ -1008,12 +1411,12 @@ function renderBT(w, fit) {
   const pc = x => (x*100).toFixed(1)+"%";
 
   const cal = e.bins.filter(x => x.n > 0).map(x =>
-    '<div class="row"><span>'+pc(x.lo)+'–'+pc(x.hi)+'  (n='+x.n+')</span>'
+    '<div class="stat-row"><span>'+pc(x.lo)+'–'+pc(x.hi)+'  (n='+x.n+')</span>'
     + '<span>pred '+pc(x.pred)+' · actual <b style="color:var(--truth)">'+pc(x.act)+'</b></span></div>'
   ).join("");
 
   out.innerHTML =
-    '<div class="card"><p class="card-label">Result · '+e.n+' games'
+    '<div class="block"><h3>Result · '+e.n+' games'
       + (BT.skipped ? ' · '+BT.skipped+' skipped' : '') + '</p>'
     + '<dl class="readout">'
     + '<div class="cell"><dt>Brier</dt><dd class="v-truth">'+f4(e.brier)+'</dd></div>'
@@ -1022,24 +1425,24 @@ function renderBT(w, fit) {
     + '<div class="cell"><dt>Log loss</dt><dd>'+f4(e.ll)+'</dd></div>'
     + '</dl>'
     + '<div style="margin-top:16px">'
-      + '<div class="row"><span>Accuracy (picked the winner)</span><span>'+pc(e.acc)+'</span></div>'
-      + '<div class="row"><span>Home teams actually won</span><span>'+pc(1-b.homeRate)+'</span></div>'
-      + '<div class="row"><span>Baseline · always 50%</span><span>'+f4(b.flat)+'</span></div>'
-      + '<div class="row"><span>Baseline · always home</span><span>'+f4(b.home)+'</span></div>'
-      + '<div class="row"><span>Baseline · team record only</span><span>'+f4(b.teamOnly)+'</span></div>'
+      + '<div class="stat-row"><span>Accuracy (picked the winner)</span><span>'+pc(e.acc)+'</span></div>'
+      + '<div class="stat-row"><span>Home teams actually won</span><span>'+pc(1-b.homeRate)+'</span></div>'
+      + '<div class="stat-row"><span>Baseline · always 50%</span><span>'+f4(b.flat)+'</span></div>'
+      + '<div class="stat-row"><span>Baseline · always home</span><span>'+f4(b.home)+'</span></div>'
+      + '<div class="stat-row"><span>Baseline · team record only</span><span>'+f4(b.teamOnly)+'</span></div>'
     + '</div></div>'
 
-    + '<div class="card"><p class="card-label">Calibration</p>'
+    + '<div class="block"><h3>Calibration</p>'
     + (cal || '<p style="color:var(--dim);font-size:13px">Not enough spread to bucket.</p>')
     + '<p style="font-size:12px;color:var(--dim);margin:12px 0 0;line-height:1.5">'
     + 'Predicted and actual should track each other. Actual consistently below predicted means '
     + 'the model is overconfident and the weights are too aggressive.</p></div>'
 
-    + (fit ? '<div class="card"><p class="card-label">Fitted weights</p>'
-        + '<div class="row"><span>Train log loss (n='+fit.nTrain+')</span><span>'+f4(fit.train.ll)+'</span></div>'
-        + '<div class="row"><span>Test log loss (n='+fit.nTest+')</span><span class="'
+    + (fit ? '<div class="block"><h3>Fitted weights</p>'
+        + '<div class="stat-row"><span>Train log loss (n='+fit.nTrain+')</span><span>'+f4(fit.train.ll)+'</span></div>'
+        + '<div class="stat-row"><span>Test log loss (n='+fit.nTest+')</span><span class="'
           +(fit.test.ll < fit.testBase.ll ? "pos":"neg")+'">'+f4(fit.test.ll)+'</span></div>'
-        + '<div class="row"><span>Test log loss · current weights</span><span>'+f4(fit.testBase.ll)+'</span></div>'
+        + '<div class="stat-row"><span>Test log loss · current weights</span><span>'+f4(fit.testBase.ll)+'</span></div>'
         + '<div style="font-family:var(--mono);font-size:11px;color:var(--dim);margin-top:12px;line-height:1.7">'
         + 'TEAM_REGRESS  '+w.TEAM_REGRESS+'<br>SP_PRIOR_IP   '+w.SP_PRIOR_IP
         + '<br>SP_L5_WEIGHT  '+w.SP_L5_WEIGHT+'<br>RUNS_TO_LOGIT '+w.RUNS_TO_LOGIT+'</div>'
@@ -1049,7 +1452,7 @@ function renderBT(w, fit) {
             : 'These did <b>not</b> beat the current weights out of sample. That is the fit chasing noise — keep what you have.')
         + '</p></div>' : '')
 
-    + '<div class="card"><p class="card-label">Adjust and re-score</p><div id="btSliders"></div></div>';
+    + '<div class="block"><h3>Adjust and re-score</p><div id="btSliders"></div></div>';
 
   const specs = [
     ["TEAM_REGRESS","Team regression",0.5,1.0,0.05],
@@ -1090,10 +1493,21 @@ function renderBT(w, fit) {
   document.getElementById("btFit").onclick = fitWeights;
 })();
 
+
+function setSort(mode) {
+  sortMode = mode;
+  document.getElementById("sortTime").setAttribute("aria-pressed", String(mode==="time"));
+  document.getElementById("sortEdge").setAttribute("aria-pressed", String(mode==="edge"));
+  render();
+}
+document.getElementById("sortTime").onclick = () => setSort("time");
+document.getElementById("sortEdge").onclick = () => setSort("edge");
+
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () =>
     navigator.serviceWorker.register("sw.js").catch(()=>{}));
 }
+
 </script>
 </body>
 </html>
