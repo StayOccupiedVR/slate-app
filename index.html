@@ -89,6 +89,12 @@
   .scratch { font-size:12px; color:var(--amber); font-weight:600; margin-top:9px;
     padding-top:9px; border-top:1px solid var(--line); }
   .scratch .wx-note { font-weight:400; }
+  .odds-row { display:flex; gap:14px; align-items:center; font-size:12.5px;
+    color:var(--ink-2); margin-top:9px; padding-top:9px; border-top:1px solid var(--line); }
+  .odds-row b { color:var(--ink); font-weight:700; }
+  .odds-bk { font-size:10px; font-weight:800; letter-spacing:.04em; text-transform:uppercase;
+    color:var(--ink-3); }
+  .odds-fair { margin-left:auto; color:var(--green-txt); font-weight:600; font-size:12px; }
   .wx { display:flex; gap:14px; flex-wrap:wrap; font-size:12px; color:var(--ink-2);
     margin-top:9px; padding-top:9px; border-top:1px solid var(--line); }
   .wx-note { color:var(--ink-3); font-style:italic; }
@@ -495,6 +501,25 @@ const API = "https://statsapi.mlb.com/api/v1";
 /* Optional: URL of nightly ML predictions (predictions.json from slate-lab).
    Example: "https://<user>.github.io/<repo>/predictions.json". Empty = off. */
 const ML_URL = "https://StayOccupiedVR.github.io/slate-lab/predictions.json";
+const ODDS_URL = "https://StayOccupiedVR.github.io/slate-lab/odds.json";
+const ODDS = {};   // "awayId-homeId" -> {ml_away, ml_home, book, captured}
+async function loadOdds(){
+  try{
+    const r = await fetch(ODDS_URL, {cache:"no-store"});
+    if(!r.ok) return;
+    const d = await r.json();
+    (d.games||[]).forEach(g => {
+      ODDS[g.away_id+"-"+g.home_id] = {
+        ml_away:g.ml_away, ml_home:g.ml_home, book:g.book, captured:d.captured };
+    });
+  }catch(e){}
+}
+function fmtML(n){ return n>0 ? "+"+n : ""+n; }
+function devigAway(o){
+  const p = m => m<0 ? (-m)/((-m)+100) : 100/(m+100);
+  const a=p(o.ml_away), h=p(o.ml_home);
+  return a/(a+h);
+}
 let MLP = {};  // gamePk -> pAway
 
 /* ---------- shared helpers ---------- */
@@ -746,6 +771,7 @@ function render() {
     const sa = pa ? S.pitch[pa.id] : null, sh = ph ? S.pitch[ph.id] : null;
     const m = modelGame(g);
     const ml = MLP[g.gamePk];
+    const odds = ODDS[aId+"-"+hId];
     const luA = g.lineups?.awayPlayers || [], luH = g.lineups?.homePlayers || [];
     const luPosted = luA.length >= 9 && luH.length >= 9;
     const scratches = luPosted ? [
@@ -759,11 +785,18 @@ function render() {
       right = '<span class="g-live"><span class="dot">●</span> ' + esc(liveInning(g)) + '</span>';
     } else if (final) {
       right = '<span class="g-when">Final</span>';
+    } else if (m && odds) {
+      const fair = devigAway(odds);
+      const gap = (m.pAway - fair) * 100;
+      if (Math.abs(gap) >= 2.5) {
+        const side = gap > 0 ? ta.ab : th.ab;
+        right = '<span class="g-badge">EDGE \u00b7 ' + side + ' +' + Math.abs(gap).toFixed(1) + '</span>';
+      }
     } else if (m && ml != null) {
       const gap = (ml - m.pAway) * 100;
       if (Math.abs(gap) >= 2.5) {
         const side = gap > 0 ? ta.ab : th.ab;
-        right = '<span class="g-badge">VALUE · ' + side + '</span>';
+        right = '<span class="g-badge">VALUE \u00b7 ' + side + '</span>';
       }
     }
     if (scratches.length && !live && !final) {
@@ -848,12 +881,22 @@ function render() {
         + ((live||final) ? '' : esc(clock(g.gameDate))+' ')
         + '</span>' + (right || '<span></span>')
         + '<span class="g-venue">'+esc(g.venue?.name||"")+'</span></div>'
-      + rows + armsFixed + wxLine(g)
+      + rows + armsFixed
+      + (odds && !live && !final
+          ? '<div class="odds-row"><span class="odds-bk">'
+            + (odds.book==="draftkings"?"DraftKings":"Hard Rock")
+            + '</span><span>'+ta.ab+' <b>'+fmtML(odds.ml_away)+'</b></span>'
+            + '<span>'+th.ab+' <b>'+fmtML(odds.ml_home)+'</b></span>'
+            + (m ? '<span class="odds-fair">fair '+ (devigAway(odds)*100).toFixed(0)+'% '+ta.ab+'</span>' : '')
+            + '</div>' : '')
+      + wxLine(g)
       + (scratches.length
           ? '<div class="scratch">\u26A0 Sitting tonight: '
             + scratches.map(s=>s.t+' '+s.n).join(', ')
             + ' <span class="wx-note">(started 2 of last 3)</span></div>' : '')
-      + (m && !live && !final ? '<button class="tovalue" data-a="'+ta.ab+'" data-h="'+th.ab+'" data-p="'+(m.pAway*100).toFixed(0)+'">Check the value \u2192</button>' : '')
+      + (m && !live && !final ? '<button class="tovalue" data-a="'+ta.ab+'" data-h="'+th.ab+'" data-p="'+(m.pAway*100).toFixed(0)
+          + (odds ? '" data-mla="'+odds.ml_away+'" data-mlb="'+odds.ml_home : '')
+          + '">'+(odds?'See the verdict':'Check the value')+' \u2192</button>' : '')
       + '<details class="d"><summary>Details</summary>'+det+'</details>'
       + '</article>';
   }).join("");
@@ -862,9 +905,14 @@ function render() {
     btn.onclick = () => {
       document.getElementById("nameA").value = btn.dataset.a;
       document.getElementById("nameB").value = btn.dataset.h;
+      if (btn.dataset.mla) document.getElementById("mlA").value = btn.dataset.mla;
+      if (btn.dataset.mlb) document.getElementById("mlB").value = btn.dataset.mlb;
       EV_EST = Number(btn.dataset.p);
-      EV_NOTE = "The model makes " + btn.dataset.a + " a " + btn.dataset.p
-        + "% favorite in this game. Enter the sportsbook's two prices to see whether that gap is worth money.";
+      EV_NOTE = btn.dataset.mla
+        ? "The model makes " + btn.dataset.a + " a " + btn.dataset.p
+          + "% favorite. DraftKings' current prices are filled in below \u2014 the verdict is what that gap is worth."
+        : "The model makes " + btn.dataset.a + " a " + btn.dataset.p
+          + "% favorite in this game. Enter the sportsbook's two prices to see whether that gap is worth money.";
       show("ev"); drawEV();
     };
   });
@@ -1042,7 +1090,8 @@ async function load() {
   setPhase("ADDING STARTER LINES…");            await loadPitchers().catch(()=>{});
   setPhase("ADDING SPLITS + LEAGUE BASELINES…"); await loadSplits().catch(()=>{});
   setPhase("ADDING BULLPEN USAGE…");             await loadBullpen().catch(()=>{});
-  setPhase("CHECKING BALLPARK WEATHER…");        await loadWeather().catch(()=>{}); render();
+  setPhase("CHECKING BALLPARK WEATHER…");        await loadWeather().catch(()=>{});
+  setPhase("PULLING DRAFTKINGS PRICES…");        await loadOdds().catch(()=>{}); render();
   setPhase("");
 }
 document.getElementById("prev").onclick = () => { date=shift(date,-1); load(); };
