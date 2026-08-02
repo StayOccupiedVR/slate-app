@@ -81,7 +81,7 @@
   .pct.lose { color:var(--ink-3); padding:2px 10px; }
   .score { font-size:21px; font-weight:800; min-width:34px; text-align:right; }
 
-  .arms { display:flex; justify-content:space-between; font-size:12px; color:var(--ink-3);
+  .arms { display:flex; width:100%;  justify-content:space-between; font-size:12px; color:var(--ink-3);
     margin-top:9px; padding-top:9px; border-top:1px solid var(--line); }
   .arms b { color:var(--ink-2); font-weight:600; }
   .arms .tbd { font-style:italic; }
@@ -93,13 +93,14 @@
   .odds-none { color:var(--ink-3); font-size:12px; }
   .best-here { font-style:normal; color:var(--green-txt); font-weight:800; font-size:11px; }
   .best-else { font-style:normal; color:var(--amber); font-weight:600; font-size:11px; }
-  .odds-row { display:flex; gap:14px; align-items:center; font-size:12.5px;
-    color:var(--ink-2); margin-top:9px; padding-top:9px; border-top:1px solid var(--line); }
+  .odds-row { display:flex; width:100%; flex-wrap:wrap; gap:6px 14px; align-items:center;
+    font-size:12.5px; color:var(--ink-2); margin-top:9px; padding-top:9px;
+    border-top:1px solid var(--line); }
   .odds-row b { color:var(--ink); font-weight:700; }
   .odds-bk { font-size:10px; font-weight:800; letter-spacing:.04em; text-transform:uppercase;
     color:var(--ink-3); }
   .odds-fair { margin-left:auto; color:var(--green-txt); font-weight:600; font-size:12px; }
-  .wx { display:flex; gap:14px; flex-wrap:wrap; font-size:12px; color:var(--ink-2);
+  .wx { display:flex; width:100%;  gap:14px; flex-wrap:wrap; font-size:12px; color:var(--ink-2);
     margin-top:9px; padding-top:9px; border-top:1px solid var(--line); }
   .wx-note { color:var(--ink-3); font-style:italic; }
   .wx-dome { color:var(--ink-3); }
