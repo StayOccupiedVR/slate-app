@@ -89,6 +89,8 @@
   .scratch { font-size:12px; color:var(--amber); font-weight:600; margin-top:9px;
     padding-top:9px; border-top:1px solid var(--line); }
   .scratch .wx-note { font-weight:400; }
+  .pill-off { opacity:.35; }
+  .odds-none { color:var(--ink-3); font-size:12px; }
   .best-here { font-style:normal; color:var(--green-txt); font-weight:800; font-size:11px; }
   .best-else { font-style:normal; color:var(--amber); font-weight:600; font-size:11px; }
   .odds-row { display:flex; gap:14px; align-items:center; font-size:12.5px;
@@ -337,9 +339,9 @@
   </div>
   <div class="bar" style="padding-top:0">
     <span style="font-size:10px;font-weight:700;letter-spacing:.05em;color:var(--ink-3)">BOOK</span>
-    <button id="bk-draftkings" class="pill-on">DK</button>
-    <button id="bk-fanduel">FD</button>
-    <button id="bk-hardrockbet">HR</button>
+    <button id="bk-draftkings" class="pill-on">DraftKings</button>
+    <button id="bk-fanduel">FanDuel</button>
+    <button id="bk-hardrockbet">Hard Rock</button>
   </div>
   <p id="phase"></p>
 
@@ -553,7 +555,8 @@ async function loadOdds(){
     });
   }catch(e){}
 }
-const BOOK_LIST = [["draftkings","DK"],["fanduel","FD"],["hardrockbet","HR"]];
+const BOOK_LIST = [["draftkings","DraftKings"],["fanduel","FanDuel"],["hardrockbet","Hard Rock"]];
+const BOOK_NAME = {draftkings:"DraftKings", fanduel:"FanDuel", hardrockbet:"Hard Rock"};
 let BOOK_SEL = "draftkings";
 function bookOdds(o){
   if(!o) return null;
@@ -940,15 +943,18 @@ function render() {
         + '</span>' + (right || '<span></span>')
         + '<span class="g-venue">'+esc(g.venue?.name||"")+'</span></div>'
       + rows + armsFixed
+      + (!odds && oddsAll && !live && !final
+          ? '<div class="odds-row"><span class="odds-none">No '+BOOK_NAME[BOOK_SEL]
+            + ' price for this game \u2014 try another book</span></div>' : '')
       + (odds && !live && !final
           ? (function(){
               const bA = bestPrice(oddsAll,"away"), bH = bestPrice(oddsAll,"home");
               const mark = (b, mine) => !b ? ""
                 : (b.k===BOOK_SEL || b.v===mine)
                   ? ' <i class="best-here" title="best price">\u2713</i>'
-                  : ' <i class="best-else">'+({draftkings:"DK",fanduel:"FD",hardrockbet:"HR"}[b.k])+' '+fmtML(b.v)+'</i>';
+                  : ' <i class="best-else">'+BOOK_NAME[b.k]+' '+fmtML(b.v)+'</i>';
               return '<div class="odds-row"><span class="odds-bk">'
-                + ({draftkings:"DraftKings",fanduel:"FanDuel",hardrockbet:"Hard Rock"}[BOOK_SEL])
+                + BOOK_NAME[BOOK_SEL]
                 + '</span><span>'+ta.ab+' <b>'+fmtML(odds.ml_away)+'</b>'+mark(bA,odds.ml_away)+'</span>'
                 + '<span>'+th.ab+' <b>'+fmtML(odds.ml_home)+'</b>'+mark(bH,odds.ml_home)+'</span>'
                 + (m ? '<span class="odds-fair">fair '+(devigAway(odds)*100).toFixed(0)+'% '+ta.ab+'</span>' : '')
@@ -975,7 +981,7 @@ function render() {
       EV_EST = Number(btn.dataset.p);
       EV_NOTE = btn.dataset.mla
         ? "The model makes " + btn.dataset.a + " a " + btn.dataset.p
-          + "% favorite. " + ({draftkings:"DraftKings",fanduel:"FanDuel",hardrockbet:"Hard Rock"}[BOOK_SEL])
+          + "% favorite. " + BOOK_NAME[BOOK_SEL]
           + "'s current prices are filled in below \u2014 the verdict is what that gap is worth."
         : "The model makes " + btn.dataset.a + " a " + btn.dataset.p
           + "% favorite in this game. Enter the sportsbook's two prices to see whether that gap is worth money.";
@@ -1157,7 +1163,8 @@ async function load() {
   setPhase("ADDING SPLITS + LEAGUE BASELINES…"); await loadSplits().catch(()=>{});
   setPhase("ADDING BULLPEN USAGE…");             await loadBullpen().catch(()=>{});
   setPhase("CHECKING BALLPARK WEATHER…");        await loadWeather().catch(()=>{});
-  setPhase("PULLING DRAFTKINGS PRICES…");        await loadOdds().catch(()=>{}); render();
+  setPhase("PULLING SPORTSBOOK PRICES…");        await loadOdds().catch(()=>{});
+  markBookAvailability(); render();
   setPhase("");
 }
 document.getElementById("prev").onclick = () => { date=shift(date,-1); load(); };
@@ -1617,6 +1624,16 @@ function setSort(mode) {
 }
 document.getElementById("sortTime").onclick = () => setSort("time");
 document.getElementById("sortEdge").onclick = () => setSort("edge");
+function markBookAvailability(){
+  const have = {};
+  Object.values(ODDS).forEach(o => Object.keys(o.books||{}).forEach(k => have[k]=true));
+  BOOK_LIST.forEach(([k]) => {
+    const btn = document.getElementById("bk-"+k);
+    if (!btn) return;
+    const ok = !!have[k];
+    btn.title = ok ? "" : "Prices for this book haven't been captured yet";
+  });
+}
 BOOK_LIST.forEach(([k]) => {
   document.getElementById("bk-"+k).onclick = () => {
     BOOK_SEL = k;
