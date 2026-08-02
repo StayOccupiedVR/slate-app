@@ -89,6 +89,8 @@
   .scratch { font-size:12px; color:var(--amber); font-weight:600; margin-top:9px;
     padding-top:9px; border-top:1px solid var(--line); }
   .scratch .wx-note { font-weight:400; }
+  .best-here { font-style:normal; color:var(--green-txt); font-weight:800; font-size:11px; }
+  .best-else { font-style:normal; color:var(--amber); font-weight:600; font-size:11px; }
   .odds-row { display:flex; gap:14px; align-items:center; font-size:12.5px;
     color:var(--ink-2); margin-top:9px; padding-top:9px; border-top:1px solid var(--line); }
   .odds-row b { color:var(--ink); font-weight:700; }
@@ -274,6 +276,26 @@
 
     <div class="sport soon">
       <div class="sport-head">
+        <span class="sport-name">🏒 NHL</span>
+        <span class="g-badge" style="background:var(--ink-3)">ROADMAP</span>
+      </div>
+      <p class="sport-sub">The closest cousin to our MLB build — goalies are the
+      starting-pitcher analog, and the season opens in October. Own backtest, own
+      ledger, own record before the page goes live.</p>
+    </div>
+
+    <div class="sport soon">
+      <div class="sport-head">
+        <span class="sport-name">🏈 NCAA Football</span>
+        <span class="g-badge" style="background:var(--ink-3)">ROADMAP</span>
+      </div>
+      <p class="sport-sub">Saturday slates with the same method — power ratings from
+      point differential, QB continuity, verified record. Builds on the NFL adapter
+      once that season's ledger is running.</p>
+    </div>
+
+    <div class="sport soon">
+      <div class="sport-head">
         <span class="sport-name">📊 Player props</span>
         <span class="g-badge" style="background:var(--ink-3)">IN DEVELOPMENT</span>
       </div>
@@ -312,6 +334,12 @@
     <span class="grow"></span>
     <button id="sortTime" class="pill-on">Time</button>
     <button id="sortEdge">Edge</button>
+  </div>
+  <div class="bar" style="padding-top:0">
+    <span style="font-size:10px;font-weight:700;letter-spacing:.05em;color:var(--ink-3)">BOOK</span>
+    <button id="bk-draftkings" class="pill-on">DK</button>
+    <button id="bk-fanduel">FD</button>
+    <button id="bk-hardrockbet">HR</button>
   </div>
   <p id="phase"></p>
 
@@ -524,6 +552,24 @@ async function loadOdds(){
         ml_away:g.ml_away, ml_home:g.ml_home, book:g.book, captured:d.captured };
     });
   }catch(e){}
+}
+const BOOK_LIST = [["draftkings","DK"],["fanduel","FD"],["hardrockbet","HR"]];
+let BOOK_SEL = "draftkings";
+function bookOdds(o){
+  if(!o) return null;
+  const b = o.books || {};
+  return b[BOOK_SEL] || (o.book===BOOK_SEL ? {ml_away:o.ml_away, ml_home:o.ml_home} : null);
+}
+function bestPrice(o, side){
+  // best price for the bettor = the LARGEST american number on that side
+  if(!o || !o.books) return null;
+  let best=null;
+  for(const [k] of BOOK_LIST){
+    const b=o.books[k]; if(!b) continue;
+    const v=b["ml_"+side];
+    if(best===null || v>best.v) best={k, v};
+  }
+  return best;
 }
 function fmtML(n){ return n>0 ? "+"+n : ""+n; }
 function devigAway(o){
@@ -782,7 +828,8 @@ function render() {
     const sa = pa ? S.pitch[pa.id] : null, sh = ph ? S.pitch[ph.id] : null;
     const m = modelGame(g);
     const ml = MLP[g.gamePk];
-    const odds = ODDS[aId+"-"+hId];
+    const oddsAll = ODDS[aId+"-"+hId];
+    const odds = bookOdds(oddsAll);
     const luA = g.lineups?.awayPlayers || [], luH = g.lineups?.homePlayers || [];
     const luPosted = luA.length >= 9 && luH.length >= 9;
     const scratches = luPosted ? [
@@ -894,12 +941,19 @@ function render() {
         + '<span class="g-venue">'+esc(g.venue?.name||"")+'</span></div>'
       + rows + armsFixed
       + (odds && !live && !final
-          ? '<div class="odds-row"><span class="odds-bk">'
-            + (odds.book==="draftkings"?"DraftKings":"Hard Rock")
-            + '</span><span>'+ta.ab+' <b>'+fmtML(odds.ml_away)+'</b></span>'
-            + '<span>'+th.ab+' <b>'+fmtML(odds.ml_home)+'</b></span>'
-            + (m ? '<span class="odds-fair">fair '+ (devigAway(odds)*100).toFixed(0)+'% '+ta.ab+'</span>' : '')
-            + '</div>' : '')
+          ? (function(){
+              const bA = bestPrice(oddsAll,"away"), bH = bestPrice(oddsAll,"home");
+              const mark = (b, mine) => !b ? ""
+                : (b.k===BOOK_SEL || b.v===mine)
+                  ? ' <i class="best-here" title="best price">\u2713</i>'
+                  : ' <i class="best-else">'+({draftkings:"DK",fanduel:"FD",hardrockbet:"HR"}[b.k])+' '+fmtML(b.v)+'</i>';
+              return '<div class="odds-row"><span class="odds-bk">'
+                + ({draftkings:"DraftKings",fanduel:"FanDuel",hardrockbet:"Hard Rock"}[BOOK_SEL])
+                + '</span><span>'+ta.ab+' <b>'+fmtML(odds.ml_away)+'</b>'+mark(bA,odds.ml_away)+'</span>'
+                + '<span>'+th.ab+' <b>'+fmtML(odds.ml_home)+'</b>'+mark(bH,odds.ml_home)+'</span>'
+                + (m ? '<span class="odds-fair">fair '+(devigAway(odds)*100).toFixed(0)+'% '+ta.ab+'</span>' : '')
+                + '</div>';
+            })() : '')
       + wxLine(g)
       + (scratches.length
           ? '<div class="scratch">\u26A0 Sitting tonight: '
@@ -921,7 +975,8 @@ function render() {
       EV_EST = Number(btn.dataset.p);
       EV_NOTE = btn.dataset.mla
         ? "The model makes " + btn.dataset.a + " a " + btn.dataset.p
-          + "% favorite. DraftKings' current prices are filled in below \u2014 the verdict is what that gap is worth."
+          + "% favorite. " + ({draftkings:"DraftKings",fanduel:"FanDuel",hardrockbet:"Hard Rock"}[BOOK_SEL])
+          + "'s current prices are filled in below \u2014 the verdict is what that gap is worth."
         : "The model makes " + btn.dataset.a + " a " + btn.dataset.p
           + "% favorite in this game. Enter the sportsbook's two prices to see whether that gap is worth money.";
       show("ev"); drawEV();
@@ -1562,6 +1617,14 @@ function setSort(mode) {
 }
 document.getElementById("sortTime").onclick = () => setSort("time");
 document.getElementById("sortEdge").onclick = () => setSort("edge");
+BOOK_LIST.forEach(([k]) => {
+  document.getElementById("bk-"+k).onclick = () => {
+    BOOK_SEL = k;
+    BOOK_LIST.forEach(([j]) =>
+      document.getElementById("bk-"+j).classList.toggle("pill-on", j===k));
+    render();
+  };
+});
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () =>
