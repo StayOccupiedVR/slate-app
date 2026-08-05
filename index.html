@@ -89,17 +89,16 @@
   .scratch { font-size:12px; color:var(--amber); font-weight:600; margin-top:9px;
     padding-top:9px; border-top:1px solid var(--line); }
   .scratch .wx-note { font-weight:400; }
-  .pill-off { opacity:.35; }
-  .odds-none { color:var(--ink-3); font-size:12px; }
-  .best-here { font-style:normal; color:var(--green-txt); font-weight:800; font-size:11px; }
-  .best-else { font-style:normal; color:var(--amber); font-weight:600; font-size:11px; }
-  .odds-row { display:flex; width:100%; flex-wrap:wrap; gap:6px 14px; align-items:center;
-    font-size:12.5px; color:var(--ink-2); margin-top:9px; padding-top:9px;
-    border-top:1px solid var(--line); }
-  .odds-row b { color:var(--ink); font-weight:700; }
-  .odds-bk { font-size:10px; font-weight:800; letter-spacing:.04em; text-transform:uppercase;
-    color:var(--ink-3); }
-  .odds-fair { margin-left:auto; color:var(--green-txt); font-weight:600; font-size:12px; }
+  .odds-tbl { width:100%; margin-top:10px; padding-top:9px; border-top:1px solid var(--line); }
+  .ot-head, .ot-row { display:grid; grid-template-columns:1fr 72px 72px; align-items:center; }
+  .ot-head { font-size:10px; font-weight:800; letter-spacing:.05em; color:var(--ink-3);
+    padding-bottom:5px; }
+  .ot-head span:not(:first-child), .ot-row span:not(:first-child) { text-align:right; }
+  .ot-row { padding:3px 0; }
+  .ot-bk { font-size:13px; color:var(--ink-2); }
+  .ov { font-size:14px; font-weight:600; color:var(--ink-2); font-variant-numeric:tabular-nums; }
+  .ov-best { color:var(--green-txt); font-weight:800; }
+  .ot-note { font-size:10.5px; color:var(--ink-3); margin-top:6px; }
   .wx { display:flex; width:100%;  gap:14px; flex-wrap:wrap; font-size:12px; color:var(--ink-2);
     margin-top:9px; padding-top:9px; border-top:1px solid var(--line); }
   .wx-note { color:var(--ink-3); font-style:italic; }
@@ -337,12 +336,7 @@
     <span class="grow"></span>
     <button id="sortTime" class="pill-on">Time</button>
     <button id="sortEdge">Edge</button>
-  </div>
-  <div class="bar" style="padding-top:0">
-    <span style="font-size:10px;font-weight:700;letter-spacing:.05em;color:var(--ink-3)">BOOK</span>
-    <button id="bk-draftkings" class="pill-on">DraftKings</button>
-    <button id="bk-fanduel">FanDuel</button>
-    <button id="bk-hardrockbet">Hard Rock</button>
+
   </div>
   <p id="phase"></p>
 
@@ -546,19 +540,34 @@ const ML_URL = "https://StayOccupiedVR.github.io/slate-lab/predictions.json";
 const ODDS_URL = "https://StayOccupiedVR.github.io/slate-lab/odds.json";
 const ODDS = {};   // "awayId-homeId" -> {ml_away, ml_home, book, captured}
 async function loadOdds(){
-  try{
-    const r = await fetch(ODDS_URL, {cache:"no-store"});
-    if(!r.ok) return;
-    const d = await r.json();
-    (d.games||[]).forEach(g => {
-      ODDS[g.away_id+"-"+g.home_id] = {
-        ml_away:g.ml_away, ml_home:g.ml_home, book:g.book, captured:d.captured };
-    });
-  }catch(e){}
+  const r = await fetch(ODDS_URL + "?t=" + Date.now());
+  if(!r.ok) throw new Error("odds.json " + r.status);
+  const d = await r.json();
+  (d.games||[]).forEach(g => {
+    ODDS[g.away_id+"-"+g.home_id] = {
+      ml_away:g.ml_away, ml_home:g.ml_home, book:g.book,
+      books:g.books || {}, captured:d.captured };
+  });
+  console.log("odds loaded:", Object.keys(ODDS).length, "games");
 }
 const BOOK_LIST = [["draftkings","DraftKings"],["fanduel","FanDuel"],["hardrockbet","Hard Rock"]];
 const BOOK_NAME = {draftkings:"DraftKings", fanduel:"FanDuel", hardrockbet:"Hard Rock"};
 let BOOK_SEL = "draftkings";
+function bestLine(o){
+  // A line-shopper takes the best number available on each side, which is
+  // what the verdict and the edge badge should be measured against.
+  if(!o) return null;
+  const b = o.books || {};
+  const ks = BOOK_LIST.map(([k])=>k).filter(k => b[k]);
+  if(!ks.length) return (o.ml_away!=null) ? {ml_away:o.ml_away, ml_home:o.ml_home,
+    srcA:o.book, srcH:o.book} : null;
+  let a = null, h = null;
+  ks.forEach(k => {
+    if(a===null || b[k].ml_away > b[a].ml_away) a = k;
+    if(h===null || b[k].ml_home > b[h].ml_home) h = k;
+  });
+  return { ml_away:b[a].ml_away, ml_home:b[h].ml_home, srcA:a, srcH:h };
+}
 function bookOdds(o){
   if(!o) return null;
   const b = o.books || {};
@@ -795,6 +804,24 @@ function findScratches(teamId, lineup){
   return regs.filter(r => !inIds.has(r.id)).map(r => r.name).slice(0,3);
 }
 
+function oddsTable(o, abA, abH, hide){
+  if (hide || !o || !o.books || !Object.keys(o.books).length) return "";
+  const rows = BOOK_LIST.filter(([k]) => o.books[k]);
+  if (!rows.length) return "";
+  const bestA = Math.max(...rows.map(([k]) => o.books[k].ml_away));
+  const bestH = Math.max(...rows.map(([k]) => o.books[k].ml_home));
+  const cell = (v, best) => '<span class="ov'+(v===best?' ov-best':'')+'">'+fmtML(v)+'</span>';
+  return '<div class="odds-tbl">'
+    + '<div class="ot-head"><span>ODDS</span><span>'+abA+'</span><span>'+abH+'</span></div>'
+    + rows.map(([k,name]) =>
+        '<div class="ot-row"><span class="ot-bk">'+name+'</span>'
+        + cell(o.books[k].ml_away, bestA)
+        + cell(o.books[k].ml_home, bestH)
+        + '</div>').join('')
+    + '<div class="ot-note">Green = best price available right now</div>'
+    + '</div>';
+}
+
 function wxLine(g){
   const w = WX[g.gamePk];
   if(!w) return "";
@@ -833,7 +860,7 @@ function render() {
     const m = modelGame(g);
     const ml = MLP[g.gamePk];
     const oddsAll = ODDS[aId+"-"+hId];
-    const odds = bookOdds(oddsAll);
+    const odds = bestLine(oddsAll);   // the best executable price on each side
     const luA = g.lineups?.awayPlayers || [], luH = g.lineups?.homePlayers || [];
     const luPosted = luA.length >= 9 && luH.length >= 9;
     const scratches = luPosted ? [
@@ -944,23 +971,7 @@ function render() {
         + '</span>' + (right || '<span></span>')
         + '<span class="g-venue">'+esc(g.venue?.name||"")+'</span></div>'
       + rows + armsFixed
-      + (!odds && oddsAll && !live && !final
-          ? '<div class="odds-row"><span class="odds-none">No '+BOOK_NAME[BOOK_SEL]
-            + ' price for this game \u2014 try another book</span></div>' : '')
-      + (odds && !live && !final
-          ? (function(){
-              const bA = bestPrice(oddsAll,"away"), bH = bestPrice(oddsAll,"home");
-              const mark = (b, mine) => !b ? ""
-                : (b.k===BOOK_SEL || b.v===mine)
-                  ? ' <i class="best-here" title="best price">\u2713</i>'
-                  : ' <i class="best-else">'+BOOK_NAME[b.k]+' '+fmtML(b.v)+'</i>';
-              return '<div class="odds-row"><span class="odds-bk">'
-                + BOOK_NAME[BOOK_SEL]
-                + '</span><span>'+ta.ab+' <b>'+fmtML(odds.ml_away)+'</b>'+mark(bA,odds.ml_away)+'</span>'
-                + '<span>'+th.ab+' <b>'+fmtML(odds.ml_home)+'</b>'+mark(bH,odds.ml_home)+'</span>'
-                + (m ? '<span class="odds-fair">fair '+(devigAway(odds)*100).toFixed(0)+'% '+ta.ab+'</span>' : '')
-                + '</div>';
-            })() : '')
+      + oddsTable(oddsAll, ta.ab, th.ab, live || final)
       + wxLine(g)
       + (scratches.length
           ? '<div class="scratch">\u26A0 Sitting tonight: '
@@ -982,8 +993,7 @@ function render() {
       EV_EST = Number(btn.dataset.p);
       EV_NOTE = btn.dataset.mla
         ? "The model makes " + btn.dataset.a + " a " + btn.dataset.p
-          + "% favorite. " + BOOK_NAME[BOOK_SEL]
-          + "'s current prices are filled in below \u2014 the verdict is what that gap is worth."
+          + "% favorite. The best available prices are filled in below \u2014 the verdict is what that gap is worth."
         : "The model makes " + btn.dataset.a + " a " + btn.dataset.p
           + "% favorite in this game. Enter the sportsbook's two prices to see whether that gap is worth money.";
       show("ev"); drawEV();
@@ -1164,8 +1174,9 @@ async function load() {
   setPhase("ADDING SPLITS + LEAGUE BASELINES…"); await loadSplits().catch(()=>{});
   setPhase("ADDING BULLPEN USAGE…");             await loadBullpen().catch(()=>{});
   setPhase("CHECKING BALLPARK WEATHER…");        await loadWeather().catch(()=>{});
-  setPhase("PULLING SPORTSBOOK PRICES…");        await loadOdds().catch(()=>{});
-  markBookAvailability(); render();
+  setPhase("PULLING SPORTSBOOK PRICES…");
+  try { await loadOdds(); } catch (e) { console.warn("odds load failed:", e); }
+  render();
   setPhase("");
 }
 document.getElementById("prev").onclick = () => { date=shift(date,-1); load(); };
@@ -1625,25 +1636,6 @@ function setSort(mode) {
 }
 document.getElementById("sortTime").onclick = () => setSort("time");
 document.getElementById("sortEdge").onclick = () => setSort("edge");
-function markBookAvailability(){
-  const have = {};
-  Object.values(ODDS).forEach(o => Object.keys(o.books||{}).forEach(k => have[k]=true));
-  BOOK_LIST.forEach(([k]) => {
-    const btn = document.getElementById("bk-"+k);
-    if (!btn) return;
-    const ok = !!have[k];
-    btn.title = ok ? "" : "Prices for this book haven't been captured yet";
-  });
-}
-BOOK_LIST.forEach(([k]) => {
-  document.getElementById("bk-"+k).onclick = () => {
-    BOOK_SEL = k;
-    BOOK_LIST.forEach(([j]) =>
-      document.getElementById("bk-"+j).classList.toggle("pill-on", j===k));
-    render();
-  };
-});
-
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () =>
     navigator.serviceWorker.register("sw.js").catch(()=>{}));
