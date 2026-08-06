@@ -250,13 +250,14 @@
       <p class="sport-cta">Open the board →</p>
     </div>
 
-    <div class="sport soon">
+    <div class="sport live" id="go-nfl">
       <div class="sport-head">
         <span class="sport-name">🏈 NFL</span>
-        <span class="g-badge" style="background:var(--amber)">SEPTEMBER</span>
+        <span class="g-badge" style="background:var(--amber)">PRESEASON</span>
       </div>
-      <p class="sport-sub">Ledger opens with the season. Team strength from point
-      differential, QB continuity from EPA — same method, same public grading.</p>
+      <p class="sport-sub">Scores and schedule now — display only. The model and
+      the public record start with Week 1 in September.</p>
+      <p class="sport-cta">Open the scoreboard →</p>
     </div>
 
     <div class="sport soon">
@@ -360,6 +361,23 @@
       Most baseball games are close to coin flips.</p>
     </div>
   </details>
+</div>
+
+<div class="wrap hide" id="view-nfl">
+  <div class="mast">
+    <div style="display:flex;align-items:center;gap:12px">
+      <button class="back" id="nflHome">‹ Home</button>
+      <h1 class="logo" style="font-size:17px">NFL</h1>
+    </div>
+    <span class="mast-meta" id="nfl-sub"></span>
+  </div>
+  <div class="note" id="nfl-note" style="text-align:left">
+    <h3>Preseason — display only</h3>
+    These games are shown for following along. The model doesn't rate
+    preseason football and none of it touches the record: predictions,
+    odds capture, and grading all start with Week 1 of the regular season.
+  </div>
+  <div class="board" id="nfl-board"></div>
 </div>
 
 <div class="wrap hide" id="view-ev">
@@ -468,6 +486,25 @@
 </nav>
 
 <script>
+const NFL_TEAMS = {
+  ARI:{c:"#97233F",lt:"#E8A0B0"}, ATL:{c:"#A71930",lt:"#E08090"},
+  BAL:{c:"#241773",lt:"#9F94D0"}, BUF:{c:"#00338D",lt:"#7F99C6"},
+  CAR:{c:"#0085CA",lt:"#7FC2E4"}, CHI:{c:"#0B162A",lt:"#8A94A8"},
+  CIN:{c:"#FB4F14",lt:"#FDA789"}, CLE:{c:"#311D00",lt:"#B0A188"},
+  DAL:{c:"#003594",lt:"#7F9AC9"}, DEN:{c:"#FB4F14",lt:"#FDA789"},
+  DET:{c:"#0076B6",lt:"#7FBADA"}, GB:{c:"#203731",lt:"#8FA39D"},
+  HOU:{c:"#03202F",lt:"#819097"}, IND:{c:"#002C5F",lt:"#7F95AF"},
+  JAX:{c:"#006778",lt:"#7FB3BB"}, KC:{c:"#E31837",lt:"#F18B9B"},
+  LV:{c:"#000000",lt:"#A5ACAF"}, LAC:{c:"#0080C6",lt:"#7FBFE2"},
+  LA:{c:"#003594",lt:"#7F9AC9"}, MIA:{c:"#008E97",lt:"#7FC6CB"},
+  MIN:{c:"#4F2683",lt:"#A792C1"}, NE:{c:"#002244",lt:"#7F90A1"},
+  NO:{c:"#D3BC8D",lt:"#2A2A24"}, NYG:{c:"#0B2265",lt:"#8590B2"},
+  NYJ:{c:"#125740",lt:"#88AB9F"}, PHI:{c:"#004C54",lt:"#7FA5A9"},
+  PIT:{c:"#FFB612",lt:"#59431A"}, SF:{c:"#AA0000",lt:"#D47F7F"},
+  SEA:{c:"#002244",lt:"#7F90A1"}, TB:{c:"#D50A0A",lt:"#EA8484"},
+  TEN:{c:"#0C2340",lt:"#8590A9"}, WAS:{c:"#5A1414",lt:"#AC8989"},
+};
+
 const PARKS = {
   147:{lat:40.8296,lon:-73.9262,roof:"open"},
   145:{lat:41.8299,lon:-87.6338,roof:"open"},
@@ -655,15 +692,15 @@ async function pool(items, limit, fn) {
 }
 
 /* ---------- tabs ---------- */
-const VIEWS = ["home","board","ev","bt"];
-const HASHES = { home:"#home", board:"#mlb", ev:"#mlb/value", bt:"#mlb/backtest" };
+const VIEWS = ["home","board","ev","bt","nfl"];
+const HASHES = { home:"#home", board:"#mlb", ev:"#mlb/value", bt:"#mlb/backtest", nfl:"#nfl" };
 function show(which, pushHash) {
   VIEWS.forEach(v => {
     document.getElementById("view-"+v).classList.toggle("hide", which !== v);
     const tab = document.getElementById("tab-"+v);
     if (tab) tab.setAttribute("aria-pressed", String(which === v));
   });
-  document.querySelector(".tabs").classList.toggle("hide", which === "home");
+  document.querySelector(".tabs").classList.toggle("hide", which === "home" || which === "nfl");
   if (pushHash !== false && HASHES[which] && location.hash !== HASHES[which]) {
     history.pushState(null, "", HASHES[which]);
   }
@@ -671,10 +708,13 @@ function show(which, pushHash) {
 }
 ["board","ev","bt"].forEach(v => { document.getElementById("tab-"+v).onclick = () => show(v); });
 document.getElementById("go-mlb").onclick = () => show("board");
+document.getElementById("go-nfl").onclick = () => { show("nfl"); loadNFL(); };
+document.getElementById("nflHome").onclick = () => show("home");
 document.getElementById("toHome").onclick = () => show("home");
 function route() {
   const h = location.hash;
-  if (h.startsWith("#mlb/value")) show("ev", false);
+  if (h.startsWith("#nfl")) { show("nfl", false); loadNFL(); }
+  else if (h.startsWith("#mlb/value")) show("ev", false);
   else if (h.startsWith("#mlb/backtest")) show("bt", false);
   else if (h.startsWith("#mlb")) show("board", false);
   else show("home", false);
@@ -822,6 +862,66 @@ async function loadWeather(){
     }catch(e){ WX[g.gamePk]=null; }
   });
   await Promise.all(jobs);
+}
+
+/* ---------- NFL scoreboard (display only; never touches the ledger) ---------- */
+const NFL_API = "https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard";
+let NFL_LOADED = 0;
+async function loadNFL(){
+  if (Date.now() - NFL_LOADED < 60000) return;   // refresh at most 1/min
+  const board = document.getElementById("nfl-board");
+  if (!NFL_LOADED) board.innerHTML = '<div class="note">Loading this week\u2019s games\u2026</div>';
+  try {
+    const r = await fetch(NFL_API);
+    if (!r.ok) throw new Error("scoreboard " + r.status);
+    const d = await r.json();
+    NFL_LOADED = Date.now();
+    renderNFL(d);
+  } catch (e) {
+    board.innerHTML = '<div class="note err"><h3>Couldn\u2019t load NFL games</h3>'
+      + esc(String(e.message || e)) + '</div>';
+  }
+}
+function renderNFL(d){
+  const evs = d.events || [];
+  const seasonType = d.season?.type;   // 1 = preseason, 2 = regular
+  const pre = seasonType === 1;
+  document.getElementById("nfl-note").classList.toggle("hide", !pre);
+  document.getElementById("nfl-sub").textContent =
+    (d.week?.number ? (pre ? "Preseason \u00b7 " : "Week ") + (pre ? "Week " + d.week.number : d.week.number) : "")
+    + " \u00b7 " + evs.length + " game" + (evs.length===1?"":"s");
+  const board = document.getElementById("nfl-board");
+  if (!evs.length) { board.innerHTML = '<div class="note">No games this week.</div>'; return; }
+  board.innerHTML = evs.map(ev => {
+    const cp = ev.competitions?.[0] || {};
+    const comp = cp.competitors || [];
+    const away = comp.find(c => c.homeAway === "away") || {};
+    const home = comp.find(c => c.homeAway === "home") || {};
+    const st = ev.status?.type || {};
+    const live = st.state === "in";
+    const final = st.state === "post";
+    const chip = t => {
+      const ab = t.team?.abbreviation || "?";
+      const col = NFL_TEAMS[ab] || {c:"#33445A", lt:"#9FB4CE"};
+      return '<div class="t-chip" style="background:'+col.c+';color:'+col.lt+'">'+esc(ab)+'</div>';
+    };
+    const row = (t, dim) =>
+      '<div class="t-row'+(dim?' dim':'')+'"><div class="t-left">'+chip(t)
+      + '<span class="t-name">'+esc(t.team?.shortDisplayName || t.team?.name || "")+'</span>'
+      + (t.records?.[0]?.summary ? '<span class="t-rec">'+esc(t.records[0].summary)+'</span>' : '')
+      + '</div>'
+      + ((live||final) ? '<span class="score">'+esc(t.score ?? "")+'</span>' : '')
+      + '</div>';
+    let head;
+    if (live) head = '<span class="g-live"><span class="dot">\u25cf</span> '+esc(st.shortDetail||"Live")+'</span>';
+    else if (final) head = '<span class="g-when">Final</span>';
+    else head = '<span class="g-when">'+esc(clock(ev.date))+'</span>';
+    return '<article class="game">'
+      + '<div class="g-head">'+head
+      + '<span class="g-venue">'+esc(cp.venue?.fullName || "")+'</span></div>'
+      + row(away, false) + row(home, false)
+      + '</article>';
+  }).join("");
 }
 
 /* ---------- render ---------- */
