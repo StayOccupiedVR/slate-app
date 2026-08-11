@@ -394,39 +394,10 @@
   <div class="board" id="nfl-board"></div>
 </div>
 
-<div class="wrap hide" id="view-props">
-  <div class="mast">
-    <div style="display:flex;align-items:center;gap:12px">
-      <button class="back" id="propsHome">‹ Home</button>
-      <h1 class="logo" style="font-size:17px">Player props</h1>
-    </div>
-    <span class="mast-meta">Research · graded when lines exist</span>
-  </div>
-  <div class="pad">
-    <div class="sport live" id="go-props-mlb">
-      <div class="sport-head">
-        <span class="sport-name">⚾ Strikeouts</span>
-        <span class="g-badge">RESEARCH</span>
-      </div>
-      <p class="sport-sub">Tonight's starters with full strikeout probability
-      distributions — calibrated, backtested on 4,573 real starts.</p>
-      <p class="sport-cta">Open tonight's board →</p>
-    </div>
-    <div class="sport soon">
-      <div class="sport-head">
-        <span class="sport-name">🏈 NFL props</span>
-        <span class="g-badge" style="background:var(--ink-3)">SEPTEMBER</span>
-      </div>
-      <p class="sport-sub">Receiving and rushing yardage distributions arrive
-      with the season, built the same way and backtested first.</p>
-    </div>
-  </div>
-</div>
-
 <div class="wrap hide" id="view-props-mlb">
   <div class="mast">
     <div style="display:flex;align-items:center;gap:12px">
-      <button class="back" id="pmBack">‹ Props</button>
+      <button class="back" id="pmBack">‹ MLB</button>
       <h1 class="logo" style="font-size:17px">Strikeouts</h1>
     </div>
     <span class="mast-meta" id="pm-sub"></span>
@@ -543,6 +514,7 @@
 
 <nav class="tabs">
   <button id="tab-board" aria-pressed="true">Board</button>
+  <button id="tab-props-mlb" aria-pressed="false">Props</button>
   <button id="tab-ev" aria-pressed="false">Value</button>
   <button id="tab-bt" aria-pressed="false">Backtest</button>
 </nav>
@@ -754,33 +726,31 @@ async function pool(items, limit, fn) {
 }
 
 /* ---------- tabs ---------- */
-const VIEWS = ["home","board","ev","bt","nfl","props","props-mlb"];
-const HASHES = { home:"#home", board:"#mlb", ev:"#mlb/value", bt:"#mlb/backtest", nfl:"#nfl", props:"#props", "props-mlb":"#props/mlb" };
+const VIEWS = ["home","board","ev","bt","nfl","props-mlb"];
+const HASHES = { home:"#home", board:"#mlb", ev:"#mlb/value", bt:"#mlb/backtest", nfl:"#nfl", "props-mlb":"#mlb/props" };
 function show(which, pushHash) {
   VIEWS.forEach(v => {
     document.getElementById("view-"+v).classList.toggle("hide", which !== v);
     const tab = document.getElementById("tab-"+v);
     if (tab) tab.setAttribute("aria-pressed", String(which === v));
   });
-  document.querySelector(".tabs").classList.toggle("hide", which === "home" || which === "nfl" || which.startsWith("props"));
+  document.querySelector(".tabs").classList.toggle("hide", which === "home" || which === "nfl");
   if (pushHash !== false && HASHES[which] && location.hash !== HASHES[which]) {
     history.pushState(null, "", HASHES[which]);
   }
   window.scrollTo(0,0);
 }
 ["board","ev","bt"].forEach(v => { document.getElementById("tab-"+v).onclick = () => show(v); });
+document.getElementById("tab-props-mlb").onclick = () => { show("props-mlb"); loadProps(); };
 document.getElementById("go-mlb").onclick = () => show("board");
 document.getElementById("go-nfl").onclick = () => { show("nfl"); loadNFL(); };
-document.getElementById("go-props").onclick = () => show("props");
-document.getElementById("go-props-mlb").onclick = () => { show("props-mlb"); loadProps(); };
-document.getElementById("propsHome").onclick = () => show("home");
-document.getElementById("pmBack").onclick = () => show("props");
+document.getElementById("go-props").onclick = () => { show("props-mlb"); loadProps(); };
+document.getElementById("pmBack").onclick = () => show("board");
 document.getElementById("nflHome").onclick = () => show("home");
 document.getElementById("toHome").onclick = () => show("home");
 function route() {
   const h = location.hash;
-  if (h.startsWith("#props/mlb")) { show("props-mlb", false); loadProps(); }
-  else if (h.startsWith("#props")) show("props", false);
+  if (h.startsWith("#mlb/props") || h.startsWith("#props")) { show("props-mlb", false); loadProps(); }
   else if (h.startsWith("#nfl")) { show("nfl", false); loadNFL(); }
   else if (h.startsWith("#mlb/value")) show("ev", false);
   else if (h.startsWith("#mlb/backtest")) show("bt", false);
@@ -935,6 +905,18 @@ async function loadWeather(){
 /* ---------- props: MLB strikeout distributions ---------- */
 const PROPS_URL = "https://StayOccupiedVR.github.io/slate-lab/props-mlb.json";
 let PROPS_LOADED = 0;
+let PROPS_DOC = null;
+const PROPS_BY_PID = {};
+async function loadPropsQuiet(){
+  // board-load companion: fill the per-pitcher index without rendering
+  try {
+    const r = await fetch(PROPS_URL + "?t=" + Date.now());
+    if (!r.ok) return;
+    const d = await r.json();
+    PROPS_DOC = d;
+    (d.pitchers || []).forEach(p => { PROPS_BY_PID[p.pitcher_id] = p; });
+  } catch (e) {}
+}
 async function loadProps(){
   if (Date.now() - PROPS_LOADED < 60000) return;
   const board = document.getElementById("pm-board");
@@ -944,6 +926,8 @@ async function loadProps(){
     if (!r.ok) throw new Error("props feed " + r.status);
     const d = await r.json();
     PROPS_LOADED = Date.now();
+    PROPS_DOC = d;
+    (d.pitchers || []).forEach(p => { PROPS_BY_PID[p.pitcher_id] = p; });
     renderProps(d);
   } catch (e) {
     board.innerHTML = '<div class="note err"><h3>No projections yet today</h3>'
@@ -1215,6 +1199,15 @@ function render() {
       + line("ERA, last 5 starts", sa&&sa.l5?sa.l5.era:"—", sh&&sh.l5?sh.l5.era:"—")
       + line("Runners allowed per inning", sa&&sa.whip?esc(sa.whip):"—", sh&&sh.whip?esc(sh.whip):"—")
       + line("Opponent hitting vs this arm", spl(aId,sh?.hand), spl(hId,sa?.hand))
+      + (function(){
+          const ka = pa ? PROPS_BY_PID[pa.id] : null;
+          const kh = ph ? PROPS_BY_PID[ph.id] : null;
+          if (!ka && !kh) return "";
+          const fmt = k => k ? k.mean.toFixed(1) + " K \u00b7 O5.5 "
+            + Math.round(100*(k.over?.["5.5"] ?? 0)) + "% \u00b7 O6.5 "
+            + Math.round(100*(k.over?.["6.5"] ?? 0)) + "%" : "\u2014";
+          return line("Projected strikeouts", fmt(ka), fmt(kh));
+        })()
       + '</table>'
       + (luPosted
           ? '<p class="lu-h">Confirmed lineups</p><div class="lu"><div><b>'+ta.ab+'</b>'
@@ -1439,6 +1432,7 @@ async function load() {
   setPhase("CHECKING BALLPARK WEATHER…");        await loadWeather().catch(()=>{});
   setPhase("PULLING SPORTSBOOK PRICES…");
   try { await loadOdds(); } catch (e) { console.warn("odds load failed:", e); }
+  await loadPropsQuiet();
   STATS_LOADED = new Date();
   showUpdated();
   render();
