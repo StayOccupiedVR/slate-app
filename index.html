@@ -69,6 +69,25 @@
   .ov-cell b { color:var(--ink); }
   .ov-line { display:block; font-size:9.5px; font-weight:800; letter-spacing:.04em;
     color:var(--ink-3); }
+  #menu-btn { position:fixed; left:14px; bottom:18px; z-index:60; width:46px; height:46px;
+    border-radius:50%; border:1px solid var(--line); background:var(--card); color:var(--ink);
+    font-size:18px; cursor:pointer; box-shadow:0 4px 14px rgba(0,0,0,.45); }
+  #scrim { position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:61;
+    opacity:0; pointer-events:none; transition:opacity .18s; }
+  #scrim.open { opacity:1; pointer-events:auto; }
+  #drawer { position:fixed; top:0; left:0; bottom:0; width:230px; z-index:62;
+    background:var(--card); border-right:1px solid var(--line);
+    transform:translateX(-100%); transition:transform .18s ease-out;
+    padding:18px 12px; display:flex; flex-direction:column; gap:2px; }
+  #drawer.open { transform:translateX(0); }
+  .dr-brand { font-weight:900; letter-spacing:.12em; font-size:15px; color:var(--green-txt);
+    padding:4px 10px 14px; }
+  .dr-sec { font-size:10px; font-weight:800; letter-spacing:.08em; color:var(--ink-3);
+    padding:12px 10px 4px; }
+  .dr-item { text-align:left; padding:9px 10px; border:0; background:none; color:var(--ink-2);
+    font-size:14px; border-radius:8px; cursor:pointer; }
+  .dr-item.on { background:var(--navy-2, rgba(61,214,160,.12)); color:var(--green-txt);
+    font-weight:700; }
   /* game card */
   .board { padding:8px 12px; }
   .game { background:var(--card); border-radius:11px; padding:12px 14px; margin-bottom:9px; }
@@ -512,11 +531,18 @@
   </details>
 </div>
 
-<nav class="tabs">
-  <button id="tab-board" aria-pressed="true">Board</button>
-  <button id="tab-props-mlb" aria-pressed="false">Props</button>
-  <button id="tab-ev" aria-pressed="false">Value</button>
-  <button id="tab-bt" aria-pressed="false">Backtest</button>
+<button id="menu-btn" aria-label="Menu">☰</button>
+<div id="scrim"></div>
+<nav id="drawer">
+  <div class="dr-brand">SLATE</div>
+  <button class="dr-item" id="nav-home">⌂ Home</button>
+  <div class="dr-sec">MLB</div>
+  <button class="dr-item" id="nav-board">Board</button>
+  <button class="dr-item" id="nav-props-mlb">Props · strikeouts</button>
+  <button class="dr-item" id="nav-ev">Value check</button>
+  <button class="dr-item" id="nav-bt">Backtest</button>
+  <div class="dr-sec">NFL</div>
+  <button class="dr-item" id="nav-nfl">Scoreboard</button>
 </nav>
 
 <script>
@@ -731,17 +757,27 @@ const HASHES = { home:"#home", board:"#mlb", ev:"#mlb/value", bt:"#mlb/backtest"
 function show(which, pushHash) {
   VIEWS.forEach(v => {
     document.getElementById("view-"+v).classList.toggle("hide", which !== v);
-    const tab = document.getElementById("tab-"+v);
-    if (tab) tab.setAttribute("aria-pressed", String(which === v));
+    const nav = document.getElementById("nav-"+v);
+    if (nav) nav.classList.toggle("on", which === v);
   });
-  document.querySelector(".tabs").classList.toggle("hide", which === "home" || which === "nfl");
+  closeDrawer();
   if (pushHash !== false && HASHES[which] && location.hash !== HASHES[which]) {
     history.pushState(null, "", HASHES[which]);
   }
   window.scrollTo(0,0);
 }
-["board","ev","bt"].forEach(v => { document.getElementById("tab-"+v).onclick = () => show(v); });
-document.getElementById("tab-props-mlb").onclick = () => { show("props-mlb"); loadProps(); };
+const drawerEl = document.getElementById("drawer");
+const scrimEl = document.getElementById("scrim");
+function openDrawer(){ drawerEl.classList.add("open"); scrimEl.classList.add("open"); }
+function closeDrawer(){ drawerEl.classList.remove("open"); scrimEl.classList.remove("open"); }
+document.getElementById("menu-btn").onclick = openDrawer;
+scrimEl.onclick = closeDrawer;
+document.getElementById("nav-home").onclick = () => show("home");
+document.getElementById("nav-board").onclick = () => show("board");
+document.getElementById("nav-props-mlb").onclick = () => { show("props-mlb"); loadProps(); };
+document.getElementById("nav-ev").onclick = () => show("ev");
+document.getElementById("nav-bt").onclick = () => show("bt");
+document.getElementById("nav-nfl").onclick = () => { show("nfl"); loadNFL(); };
 document.getElementById("go-mlb").onclick = () => show("board");
 document.getElementById("go-nfl").onclick = () => { show("nfl"); loadNFL(); };
 document.getElementById("go-props").onclick = () => { show("props-mlb"); loadProps(); };
