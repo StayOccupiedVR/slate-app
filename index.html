@@ -55,6 +55,23 @@
     min-height:12px; text-transform:uppercase; }
 
   #updated { font-size:11px; color:var(--ink-3); padding:2px 16px 6px; min-height:13px; }
+  .pm-switch { display:flex; gap:8px; padding:10px 16px 2px; }
+  .pm-seg { flex:1; padding:8px 0; border:1px solid var(--line); background:var(--card);
+    color:var(--ink-2); font-size:13px; font-weight:700; border-radius:999px; cursor:pointer; }
+  .pm-seg.on { background:var(--green); color:#06251A; border-color:var(--green); }
+  .bt-row { display:flex; align-items:center; gap:10px; width:100%; padding:10px 0;
+    border-bottom:1px solid var(--line); }
+  .bt-row:last-child { border-bottom:0; }
+  .bt-who { flex:1; min-width:0; }
+  .bt-name { font-size:14px; font-weight:700; white-space:nowrap; overflow:hidden;
+    text-overflow:ellipsis; }
+  .bt-match { font-size:11px; color:var(--ink-3); }
+  .bt-cell { width:56px; text-align:center; font-size:14px; font-weight:600; }
+  .bt-cell small { display:block; font-size:9px; font-weight:800; letter-spacing:.05em;
+    color:var(--ink-3); }
+  .bt-hot { color:var(--green-txt); font-weight:800; }
+  .bt-head { display:flex; justify-content:flex-end; gap:0; padding:6px 16px 0;
+    font-size:0; }
   .pm-name { font-size:15px; font-weight:800; display:flex; justify-content:space-between;
     align-items:baseline; margin:2px 0 8px; }
   .pm-mean { font-size:12px; font-weight:600; color:var(--green-txt); }
@@ -429,6 +446,11 @@
     see the opposing lineup. No lines, no edges — those come only when
     they can be filed and publicly graded.
   </div>
+  <div class="pm-switch">
+    <button id="pm-k" class="pm-seg on">Strikeouts</button>
+    <button id="pm-hits" class="pm-seg">Hits</button>
+    <button id="pm-hr" class="pm-seg">Home runs</button>
+  </div>
   <div class="board" id="pm-board"></div>
 </div>
 
@@ -782,6 +804,9 @@ document.getElementById("go-mlb").onclick = () => show("board");
 document.getElementById("go-nfl").onclick = () => { show("nfl"); loadNFL(); };
 document.getElementById("go-props").onclick = () => { show("props-mlb"); loadProps(); };
 document.getElementById("pmBack").onclick = () => show("board");
+["k","hits","hr"].forEach(m => {
+  document.getElementById("pm-" + m).onclick = () => setPMMode(m);
+});
 document.getElementById("nflHome").onclick = () => show("home");
 document.getElementById("toHome").onclick = () => show("home");
 function route() {
@@ -971,11 +996,44 @@ async function loadProps(){
       + esc(String(e.message || e)) + '</div>';
   }
 }
+let PM_MODE = "k";
+function setPMMode(m){
+  PM_MODE = m;
+  ["k","hits","hr"].forEach(x =>
+    document.getElementById("pm-" + x).classList.toggle("on", x === m));
+  if (PROPS_DOC) renderProps(PROPS_DOC);
+}
+function pmPct(x){ return Math.round(100 * (x ?? 0)) + "%"; }
+function renderBatters(d, mode){
+  const bs = (d.batters || []).slice();
+  const board = document.getElementById("pm-board");
+  if (!bs.length) {
+    board.innerHTML = '<div class="note">Batter projections publish with the morning run once the batting history is loaded.</div>';
+    return;
+  }
+  if (mode === "hits") bs.sort((a, b) => (b.hits.over["1.5"]) - (a.hits.over["1.5"]));
+  else bs.sort((a, b) => (b.hr.over["0.5"]) - (a.hr.over["0.5"]));
+  const cells = b => mode === "hits"
+    ? '<div class="bt-cell'+(b.hits.over["0.5"]>=0.7?' bt-hot':'')+'">'+pmPct(b.hits.over["0.5"])+'<small>1+ H</small></div>'
+      + '<div class="bt-cell'+(b.hits.over["1.5"]>=0.3?' bt-hot':'')+'">'+pmPct(b.hits.over["1.5"])+'<small>2+ H</small></div>'
+      + '<div class="bt-cell">'+pmPct(b.hits.over["2.5"])+'<small>3+ H</small></div>'
+    : '<div class="bt-cell'+(b.hr.over["0.5"]>=0.2?' bt-hot':'')+'">'+pmPct(b.hr.over["0.5"])+'<small>1+ HR</small></div>'
+      + '<div class="bt-cell">'+pmPct(b.hr.over["1.5"])+'<small>2+ HR</small></div>';
+  board.innerHTML = '<article class="game">'
+    + bs.slice(0, 60).map(b =>
+      '<div class="bt-row"><div class="bt-who">'
+      + '<div class="bt-name">'+esc(b.name)+'</div>'
+      + '<div class="bt-match">'+esc(b.team)+' vs '+esc(b.opp)+' \u00b7 '+b.n_prior+' games</div>'
+      + '</div>' + cells(b) + '</div>').join("")
+    + '</article>';
+}
 function renderProps(d){
+  document.getElementById("pm-sub").textContent =
+    d.date + " \u00b7 " + ((d.pitchers||[]).length) + " starters"
+    + ((d.batters||[]).length ? " \u00b7 " + d.batters.length + " batters" : "");
+  if (PM_MODE !== "k") { renderBatters(d, PM_MODE); return; }
   const ps = (d.pitchers || []).slice()
     .sort((a, b) => b.mean - a.mean);
-  document.getElementById("pm-sub").textContent =
-    d.date + " \u00b7 " + ps.length + " starters";
   const board = document.getElementById("pm-board");
   if (!ps.length) {
     board.innerHTML = '<div class="note">No probable starters posted yet \u2014 check back after lineups drop.</div>';
