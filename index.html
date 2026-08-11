@@ -55,6 +55,18 @@
     min-height:12px; text-transform:uppercase; }
 
   #updated { font-size:11px; color:var(--ink-3); padding:2px 16px 6px; min-height:13px; }
+  .pm-log { width:100%; border-collapse:collapse; margin:8px 0 4px; font-size:12px; }
+  .pm-log th { text-align:left; font-size:9.5px; font-weight:800; letter-spacing:.05em;
+    color:var(--ink-3); padding:2px 6px 4px 0; }
+  .pm-log td { padding:2px 6px 2px 0; color:var(--ink-2); border-top:1px solid var(--line); }
+  .pm-split { display:flex; align-items:baseline; gap:8px; font-size:12px;
+    color:var(--ink-2); padding:3px 0; }
+  .pm-split b { color:var(--green-txt); }
+  .pm-split small { color:var(--ink-3); }
+  .pm-gap { height:14px; border-top:1px solid var(--line); margin-top:14px; }
+  .bt-det > summary { list-style:none; cursor:pointer; }
+  .bt-det > summary::-webkit-details-marker { display:none; }
+  .bt-det[open] { padding-bottom:8px; }
   .pm-switch { display:flex; gap:8px; padding:10px 16px 2px; }
   .pm-seg { flex:1; padding:8px 0; border:1px solid var(--line); background:var(--card);
     color:var(--ink-2); font-size:13px; font-weight:700; border-radius:999px; cursor:pointer; }
@@ -1004,62 +1016,103 @@ function setPMMode(m){
   if (PROPS_DOC) renderProps(PROPS_DOC);
 }
 function pmPct(x){ return Math.round(100 * (x ?? 0)) + "%"; }
-function renderBatters(d, mode){
-  const bs = (d.batters || []).slice();
-  const board = document.getElementById("pm-board");
-  if (!bs.length) {
-    board.innerHTML = '<div class="note">Batter projections publish with the morning run once the batting history is loaded.</div>';
-    return;
-  }
-  if (mode === "hits") bs.sort((a, b) => (b.hits.over["1.5"]) - (a.hits.over["1.5"]));
-  else bs.sort((a, b) => (b.hr.over["0.5"]) - (a.hr.over["0.5"]));
-  const cells = b => mode === "hits"
-    ? '<div class="bt-cell'+(b.hits.over["0.5"]>=0.7?' bt-hot':'')+'">'+pmPct(b.hits.over["0.5"])+'<small>1+ H</small></div>'
-      + '<div class="bt-cell'+(b.hits.over["1.5"]>=0.3?' bt-hot':'')+'">'+pmPct(b.hits.over["1.5"])+'<small>2+ H</small></div>'
-      + '<div class="bt-cell">'+pmPct(b.hits.over["2.5"])+'<small>3+ H</small></div>'
-    : '<div class="bt-cell'+(b.hr.over["0.5"]>=0.2?' bt-hot':'')+'">'+pmPct(b.hr.over["0.5"])+'<small>1+ HR</small></div>'
-      + '<div class="bt-cell">'+pmPct(b.hr.over["1.5"])+'<small>2+ HR</small></div>';
-  board.innerHTML = '<article class="game">'
-    + bs.slice(0, 60).map(b =>
-      '<div class="bt-row"><div class="bt-who">'
-      + '<div class="bt-name">'+esc(b.name)+'</div>'
-      + '<div class="bt-match">'+esc(b.team)+' vs '+esc(b.opp)+' \u00b7 '+b.n_prior+' games</div>'
-      + '</div>' + cells(b) + '</div>').join("")
-    + '</article>';
+function fmtDateShort(d){
+  const m = d.slice(5, 7), day = d.slice(8, 10);
+  return parseInt(m) + "/" + parseInt(day);
+}
+function splitLine(label, sp){
+  if (!sp || sp.rate == null) return "";
+  return '<div class="pm-split"><span>' + label + "</span><b>"
+    + (sp.rate * 100).toFixed(1) + "%</b><small>" + sp.n + " opp</small></div>";
+}
+function pitcherCard(p){
+  const pmf = p.pmf || [];
+  const peak = Math.max(...pmf, 0.001);
+  const bars = pmf.slice(0, 13).map((v, k) =>
+    '<div class="kb-col"><div class="kb-bar" style="height:'
+    + Math.max(2, Math.round(44 * v / peak)) + 'px"></div>'
+    + '<span class="kb-x">' + k + "</span></div>").join("");
+  const overs = ["4.5", "5.5", "6.5", "7.5"].map(ln =>
+    '<div class="ov-cell"><span class="ov-line">O' + ln + "</span>"
+    + "<b>" + Math.round(100 * (p.over?.[ln] ?? 0)) + "%</b></div>").join("");
+  const log = (p.last10 || []).map(g =>
+    '<tr><td>' + fmtDateShort(g.date) + "</td><td>" + g.so + " K</td><td>"
+    + g.bf + " BF</td><td>" + (g.bf ? (100 * g.so / g.bf).toFixed(0) : "–")
+    + "%</td></tr>").join("");
+  const splits = splitLine("K% vs top-half offenses", p.vs_top_offense)
+    + splitLine("K% vs bottom-half offenses", p.vs_bottom_offense);
+  return '<div class="pm-name">' + esc(p.name)
+    + '<span class="pm-mean">' + p.mean.toFixed(1) + " K expected</span></div>"
+    + '<div class="kb-row">' + bars + "</div>"
+    + '<div class="ov-row">' + overs + "</div>"
+    + '<details class="d"><summary>Last 10 starts & splits</summary>'
+    + '<table class="pm-log"><tr><th>Date</th><th>K</th><th>BF</th><th>K%</th></tr>'
+    + log + "</table>" + splits + "</details>";
+}
+function batterRow(b, mode){
+  const cells = mode === "hits"
+    ? '<div class="bt-cell' + (b.hits.over["0.5"] >= 0.7 ? " bt-hot" : "") + '">' + pmPct(b.hits.over["0.5"]) + "<small>1+ H</small></div>"
+      + '<div class="bt-cell' + (b.hits.over["1.5"] >= 0.3 ? " bt-hot" : "") + '">' + pmPct(b.hits.over["1.5"]) + "<small>2+ H</small></div>"
+      + '<div class="bt-cell">' + pmPct(b.hits.over["2.5"]) + "<small>3+ H</small></div>"
+    : '<div class="bt-cell' + (b.hr.over["0.5"] >= 0.2 ? " bt-hot" : "") + '">' + pmPct(b.hr.over["0.5"]) + "<small>1+ HR</small></div>"
+      + '<div class="bt-cell">' + pmPct(b.hr.over["1.5"]) + "<small>2+ HR</small></div>";
+  const log = (b.last10 || []).map(g =>
+    '<tr><td>' + fmtDateShort(g.date) + "</td><td>" + g.h + "-" + g.ab
+    + "</td><td>" + (g.hr ? g.hr + " HR" : "") + "</td></tr>").join("");
+  const splits = splitLine("BA vs top-half pitching", b.vs_top_pitching)
+    + splitLine("BA vs bottom-half pitching", b.vs_bottom_pitching);
+  return '<details class="bt-det"><summary><div class="bt-row">'
+    + '<div class="bt-who"><div class="bt-name">' + esc(b.name) + "</div>"
+    + '<div class="bt-match">' + b.n_prior + " games</div></div>"
+    + cells + "</div></summary>"
+    + '<table class="pm-log"><tr><th>Date</th><th>H-AB</th><th>HR</th></tr>'
+    + log + "</table>" + splits + "</details>";
 }
 function renderProps(d){
   document.getElementById("pm-sub").textContent =
-    d.date + " \u00b7 " + ((d.pitchers||[]).length) + " starters"
-    + ((d.batters||[]).length ? " \u00b7 " + d.batters.length + " batters" : "");
-  if (PM_MODE !== "k") { renderBatters(d, PM_MODE); return; }
-  const ps = (d.pitchers || []).slice()
-    .sort((a, b) => b.mean - a.mean);
+    d.date + " \u00b7 " + ((d.pitchers || []).length) + " starters"
+    + ((d.batters || []).length ? " \u00b7 " + d.batters.length + " batters" : "");
   const board = document.getElementById("pm-board");
-  if (!ps.length) {
-    board.innerHTML = '<div class="note">No probable starters posted yet \u2014 check back after lineups drop.</div>';
+  const games = {};
+  (d.pitchers || []).forEach(p => {
+    const k = p.gamePk || (p.team + "-" + p.opp);
+    (games[k] = games[k] || {pitchers: [], batters: [], teams: {}}).pitchers.push(p);
+    games[k].teams[p.team] = 1; games[k].teams[p.opp] = 1;
+  });
+  (d.batters || []).forEach(b => {
+    const k = b.gamePk || (b.team + "-" + b.opp);
+    (games[k] = games[k] || {pitchers: [], batters: [], teams: {}}).batters.push(b);
+    games[k].teams[b.team] = 1; games[k].teams[b.opp] = 1;
+  });
+  const keys = Object.keys(games);
+  if (!keys.length) {
+    board.innerHTML = '<div class="note">Projections publish with the morning score run (7 AM ET).</div>';
     return;
   }
-  board.innerHTML = ps.map(p => {
-    const pmf = p.pmf || [];
-    const peak = Math.max(...pmf, 0.001);
-    const bars = pmf.slice(0, 13).map((v, k) =>
-      '<div class="kb-col"><div class="kb-bar" style="height:'
-      + Math.max(2, Math.round(44 * v / peak)) + 'px"></div>'
-      + '<span class="kb-x">' + k + '</span></div>').join("");
-    const overs = ["4.5","5.5","6.5","7.5"].map(ln =>
-      '<div class="ov-cell"><span class="ov-line">O' + ln + '</span>'
-      + '<b>' + Math.round(100 * (p.over?.[ln] ?? 0)) + '%</b></div>').join("");
-    return '<article class="game">'
-      + '<div class="g-head"><span class="g-when">' + esc(p.team) + ' vs ' + esc(p.opp) + '</span>'
-      + '<span class="g-venue">' + p.n_prior + ' career starts</span></div>'
-      + '<div class="pm-name">' + esc(p.name)
-      + '<span class="pm-mean">' + p.mean.toFixed(1) + ' K expected</span></div>'
-      + '<div class="kb-row">' + bars + '</div>'
-      + '<div class="ov-row">' + overs + '</div>'
-      + '</article>';
+  board.innerHTML = keys.map(k => {
+    const g = games[k];
+    const title = g.pitchers.length
+      ? esc(g.pitchers[0].team) + " @ " + esc(g.pitchers[0].opp)
+      : Object.keys(g.teams).map(esc).join(" @ ");
+    let body = "";
+    if (PM_MODE === "k") {
+      body = g.pitchers.length
+        ? g.pitchers.map(pitcherCard).join('<div class="pm-gap"></div>')
+        : '<div class="bt-match" style="padding:6px 0">No projected starters for this game yet.</div>';
+    } else {
+      const bs = g.batters.slice();
+      if (PM_MODE === "hits") bs.sort((a, b) => b.hits.over["1.5"] - a.hits.over["1.5"]);
+      else bs.sort((a, b) => b.hr.over["0.5"] - a.hr.over["0.5"]);
+      body = bs.length
+        ? bs.map(b => batterRow(b, PM_MODE)).join("")
+        : '<div class="bt-match" style="padding:6px 0">Batter history still loading for this game.</div>';
+    }
+    return '<article class="game"><div class="g-head"><span class="g-when">'
+      + title + '</span><span class="g-venue">'
+      + (PM_MODE === "k" ? "strikeouts" : PM_MODE === "hits" ? "hits" : "home runs")
+      + "</span></div>" + body + "</article>";
   }).join("");
 }
-
 /* ---------- NFL scoreboard (display only; never touches the ledger) ---------- */
 const NFL_API = "https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard";
 const NFL_ODDS_URL = "https://StayOccupiedVR.github.io/slate-lab/nfl-odds.json";
