@@ -55,6 +55,20 @@
     min-height:12px; text-transform:uppercase; }
 
   #updated { font-size:11px; color:var(--ink-3); padding:2px 16px 6px; min-height:13px; }
+  .pm-name { font-size:15px; font-weight:800; display:flex; justify-content:space-between;
+    align-items:baseline; margin:2px 0 8px; }
+  .pm-mean { font-size:12px; font-weight:600; color:var(--green-txt); }
+  .kb-row { display:flex; align-items:flex-end; gap:3px; width:100%; height:62px; }
+  .kb-col { flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; }
+  .kb-bar { width:100%; max-width:22px; background:var(--green); border-radius:2px 2px 0 0;
+    opacity:.85; }
+  .kb-x { font-size:9px; color:var(--ink-3); }
+  .ov-row { display:flex; gap:8px; width:100%; margin-top:9px; padding-top:8px;
+    border-top:1px solid var(--line); }
+  .ov-cell { flex:1; text-align:center; font-size:14px; }
+  .ov-cell b { color:var(--ink); }
+  .ov-line { display:block; font-size:9.5px; font-weight:800; letter-spacing:.04em;
+    color:var(--ink-3); }
   /* game card */
   .board { padding:8px 12px; }
   .game { background:var(--card); border-radius:11px; padding:12px 14px; margin-bottom:9px; }
@@ -298,10 +312,10 @@
       once that season's ledger is running.</p>
     </div>
 
-    <div class="sport soon">
+    <div class="sport live" id="go-props">
       <div class="sport-head">
         <span class="sport-name">📊 Player props</span>
-        <span class="g-badge" style="background:var(--ink-3)">IN DEVELOPMENT</span>
+        <span class="g-badge">MLB LIVE</span>
       </div>
       <p class="sport-sub">One props hub, broken out by sport — MLB strikeouts and
       total bases first, then NFL, UFC, and PGA as each sport comes online. Graded
@@ -378,6 +392,54 @@
     odds capture, and grading all start with Week 1 of the regular season.
   </div>
   <div class="board" id="nfl-board"></div>
+</div>
+
+<div class="wrap hide" id="view-props">
+  <div class="mast">
+    <div style="display:flex;align-items:center;gap:12px">
+      <button class="back" id="propsHome">‹ Home</button>
+      <h1 class="logo" style="font-size:17px">Player props</h1>
+    </div>
+    <span class="mast-meta">Research · graded when lines exist</span>
+  </div>
+  <div class="pad">
+    <div class="sport live" id="go-props-mlb">
+      <div class="sport-head">
+        <span class="sport-name">⚾ Strikeouts</span>
+        <span class="g-badge">RESEARCH</span>
+      </div>
+      <p class="sport-sub">Tonight's starters with full strikeout probability
+      distributions — calibrated, backtested on 4,573 real starts.</p>
+      <p class="sport-cta">Open tonight's board →</p>
+    </div>
+    <div class="sport soon">
+      <div class="sport-head">
+        <span class="sport-name">🏈 NFL props</span>
+        <span class="g-badge" style="background:var(--ink-3)">SEPTEMBER</span>
+      </div>
+      <p class="sport-sub">Receiving and rushing yardage distributions arrive
+      with the season, built the same way and backtested first.</p>
+    </div>
+  </div>
+</div>
+
+<div class="wrap hide" id="view-props-mlb">
+  <div class="mast">
+    <div style="display:flex;align-items:center;gap:12px">
+      <button class="back" id="pmBack">‹ Props</button>
+      <h1 class="logo" style="font-size:17px">Strikeouts</h1>
+    </div>
+    <span class="mast-meta" id="pm-sub"></span>
+  </div>
+  <div class="note" id="pm-note" style="text-align:left">
+    <h3>Research, not picks</h3>
+    Probability distributions for tonight's starters, from each pitcher's
+    strikeout rate and workload history. Mid-range probabilities graded
+    well in backtesting; the model runs hot on 70%+ calls and doesn't yet
+    see the opposing lineup. No lines, no edges — those come only when
+    they can be filed and publicly graded.
+  </div>
+  <div class="board" id="pm-board"></div>
 </div>
 
 <div class="wrap hide" id="view-ev">
@@ -692,15 +754,15 @@ async function pool(items, limit, fn) {
 }
 
 /* ---------- tabs ---------- */
-const VIEWS = ["home","board","ev","bt","nfl"];
-const HASHES = { home:"#home", board:"#mlb", ev:"#mlb/value", bt:"#mlb/backtest", nfl:"#nfl" };
+const VIEWS = ["home","board","ev","bt","nfl","props","props-mlb"];
+const HASHES = { home:"#home", board:"#mlb", ev:"#mlb/value", bt:"#mlb/backtest", nfl:"#nfl", props:"#props", "props-mlb":"#props/mlb" };
 function show(which, pushHash) {
   VIEWS.forEach(v => {
     document.getElementById("view-"+v).classList.toggle("hide", which !== v);
     const tab = document.getElementById("tab-"+v);
     if (tab) tab.setAttribute("aria-pressed", String(which === v));
   });
-  document.querySelector(".tabs").classList.toggle("hide", which === "home" || which === "nfl");
+  document.querySelector(".tabs").classList.toggle("hide", which === "home" || which === "nfl" || which.startsWith("props"));
   if (pushHash !== false && HASHES[which] && location.hash !== HASHES[which]) {
     history.pushState(null, "", HASHES[which]);
   }
@@ -709,11 +771,17 @@ function show(which, pushHash) {
 ["board","ev","bt"].forEach(v => { document.getElementById("tab-"+v).onclick = () => show(v); });
 document.getElementById("go-mlb").onclick = () => show("board");
 document.getElementById("go-nfl").onclick = () => { show("nfl"); loadNFL(); };
+document.getElementById("go-props").onclick = () => show("props");
+document.getElementById("go-props-mlb").onclick = () => { show("props-mlb"); loadProps(); };
+document.getElementById("propsHome").onclick = () => show("home");
+document.getElementById("pmBack").onclick = () => show("props");
 document.getElementById("nflHome").onclick = () => show("home");
 document.getElementById("toHome").onclick = () => show("home");
 function route() {
   const h = location.hash;
-  if (h.startsWith("#nfl")) { show("nfl", false); loadNFL(); }
+  if (h.startsWith("#props/mlb")) { show("props-mlb", false); loadProps(); }
+  else if (h.startsWith("#props")) show("props", false);
+  else if (h.startsWith("#nfl")) { show("nfl", false); loadNFL(); }
   else if (h.startsWith("#mlb/value")) show("ev", false);
   else if (h.startsWith("#mlb/backtest")) show("bt", false);
   else if (h.startsWith("#mlb")) show("board", false);
@@ -862,6 +930,56 @@ async function loadWeather(){
     }catch(e){ WX[g.gamePk]=null; }
   });
   await Promise.all(jobs);
+}
+
+/* ---------- props: MLB strikeout distributions ---------- */
+const PROPS_URL = "https://StayOccupiedVR.github.io/slate-lab/props-mlb.json";
+let PROPS_LOADED = 0;
+async function loadProps(){
+  if (Date.now() - PROPS_LOADED < 60000) return;
+  const board = document.getElementById("pm-board");
+  if (!PROPS_LOADED) board.innerHTML = '<div class="note">Loading tonight\u2019s starters\u2026</div>';
+  try {
+    const r = await fetch(PROPS_URL + "?t=" + Date.now());
+    if (!r.ok) throw new Error("props feed " + r.status);
+    const d = await r.json();
+    PROPS_LOADED = Date.now();
+    renderProps(d);
+  } catch (e) {
+    board.innerHTML = '<div class="note err"><h3>No projections yet today</h3>'
+      + 'Projections publish with the morning score run (7 AM ET). '
+      + esc(String(e.message || e)) + '</div>';
+  }
+}
+function renderProps(d){
+  const ps = (d.pitchers || []).slice()
+    .sort((a, b) => b.mean - a.mean);
+  document.getElementById("pm-sub").textContent =
+    d.date + " \u00b7 " + ps.length + " starters";
+  const board = document.getElementById("pm-board");
+  if (!ps.length) {
+    board.innerHTML = '<div class="note">No probable starters posted yet \u2014 check back after lineups drop.</div>';
+    return;
+  }
+  board.innerHTML = ps.map(p => {
+    const pmf = p.pmf || [];
+    const peak = Math.max(...pmf, 0.001);
+    const bars = pmf.slice(0, 13).map((v, k) =>
+      '<div class="kb-col"><div class="kb-bar" style="height:'
+      + Math.max(2, Math.round(44 * v / peak)) + 'px"></div>'
+      + '<span class="kb-x">' + k + '</span></div>').join("");
+    const overs = ["4.5","5.5","6.5","7.5"].map(ln =>
+      '<div class="ov-cell"><span class="ov-line">O' + ln + '</span>'
+      + '<b>' + Math.round(100 * (p.over?.[ln] ?? 0)) + '%</b></div>').join("");
+    return '<article class="game">'
+      + '<div class="g-head"><span class="g-when">' + esc(p.team) + ' vs ' + esc(p.opp) + '</span>'
+      + '<span class="g-venue">' + p.n_prior + ' career starts</span></div>'
+      + '<div class="pm-name">' + esc(p.name)
+      + '<span class="pm-mean">' + p.mean.toFixed(1) + ' K expected</span></div>'
+      + '<div class="kb-row">' + bars + '</div>'
+      + '<div class="ov-row">' + overs + '</div>'
+      + '</article>';
+  }).join("");
 }
 
 /* ---------- NFL scoreboard (display only; never touches the ledger) ---------- */
