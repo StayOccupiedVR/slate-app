@@ -2,7 +2,7 @@
    Shell is cached so the app opens instantly and survives a dead connection.
    Live MLB data is never cached — stale standings are worse than no standings. */
 
-const CACHE = "slate-v28";
+const CACHE = "slate-v33";
 const SHELL = [
   "./",
   "./index.html",
@@ -35,6 +35,8 @@ self.addEventListener("fetch", e => {
   if (url.pathname.endsWith("/odds.json")) return;
   if (url.pathname.endsWith("/nfl-odds.json")) return;
   if (url.pathname.endsWith("/props-mlb.json")) return;
+  if (url.pathname.endsWith("/nfl-predictions.json")) return;
+  if (url.pathname.endsWith("/nfl-props.json")) return;
   if (url.pathname.endsWith("/predictions.json")) return;
   if (url.pathname.endsWith("/report.json")) return;
 

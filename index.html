@@ -55,6 +55,12 @@
     min-height:12px; text-transform:uppercase; }
 
   #updated { font-size:11px; color:var(--ink-3); padding:2px 16px 6px; min-height:13px; }
+  .ot-4col .ot-head, .ot-4col .ot-row { grid-template-columns:1fr 62px 62px 58px; }
+  .yb { position:relative; height:8px; background:var(--navy); border-radius:4px;
+    margin-top:5px; max-width:220px; }
+  .yb-band { position:absolute; top:0; bottom:0; background:var(--green); opacity:.45;
+    border-radius:4px; }
+  .yb-med { position:absolute; top:-2px; bottom:-2px; width:2px; background:var(--green-txt); }
   .pm-log { width:100%; border-collapse:collapse; margin:8px 0 4px; font-size:12px; }
   .pm-log th { text-align:left; font-size:9.5px; font-weight:800; letter-spacing:.05em;
     color:var(--ink-3); padding:2px 6px 4px 0; }
@@ -104,19 +110,39 @@
   #scrim { position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:61;
     opacity:0; pointer-events:none; transition:opacity .18s; }
   #scrim.open { opacity:1; pointer-events:auto; }
-  #drawer { position:fixed; top:0; left:0; bottom:0; width:230px; z-index:62;
-    background:var(--card); border-right:1px solid var(--line);
+  #drawer { position:fixed; top:0; left:0; bottom:0; width:248px; z-index:62;
+    background:linear-gradient(180deg, var(--card) 0%, var(--navy) 140%);
+    border-right:1px solid var(--line);
     transform:translateX(-100%); transition:transform .18s ease-out;
-    padding:18px 12px; display:flex; flex-direction:column; gap:2px; }
+    padding:20px 14px 14px; display:flex; flex-direction:column; gap:3px; }
   #drawer.open { transform:translateX(0); }
-  .dr-brand { font-weight:900; letter-spacing:.12em; font-size:15px; color:var(--green-txt);
-    padding:4px 10px 14px; }
-  .dr-sec { font-size:10px; font-weight:800; letter-spacing:.08em; color:var(--ink-3);
-    padding:12px 10px 4px; }
-  .dr-item { text-align:left; padding:9px 10px; border:0; background:none; color:var(--ink-2);
-    font-size:14px; border-radius:8px; cursor:pointer; }
-  .dr-item.on { background:var(--navy-2, rgba(61,214,160,.12)); color:var(--green-txt);
-    font-weight:700; }
+  .dr-brand { font-weight:900; letter-spacing:.14em; font-size:16px; color:var(--green-txt);
+    padding:2px 10px 16px; display:flex; flex-direction:column; gap:3px;
+    border-bottom:1px solid var(--line); margin-bottom:10px; }
+  .dr-tag { font-size:9.5px; font-weight:700; letter-spacing:.09em; color:var(--ink-3);
+    text-transform:uppercase; }
+  .dr-sec { font-size:10px; font-weight:800; letter-spacing:.1em; color:var(--ink-3);
+    padding:14px 10px 5px; }
+  .dr-item { display:flex; align-items:center; gap:11px; text-align:left;
+    padding:10px 10px 10px 12px; border:0; background:none; color:var(--ink-2);
+    font-size:14px; font-weight:600; border-radius:9px; cursor:pointer;
+    border-left:3px solid transparent; }
+  .dr-item svg { width:15px; height:15px; fill:currentColor; stroke:currentColor;
+    opacity:.75; flex:0 0 auto; }
+  .dr-item:active { background:rgba(255,255,255,.04); }
+  .dr-item.on { background:rgba(61,214,160,.1); color:var(--green-txt);
+    border-left-color:var(--green); font-weight:700; }
+  .dr-item.on svg { opacity:1; }
+  .dr-foot { margin-top:auto; padding:12px 10px 2px; font-size:10.5px;
+    color:var(--ink-3); border-top:1px solid var(--line); letter-spacing:.02em; }
+
+  /* wide screens: the drawer becomes a pinned sidebar */
+  @media (min-width: 1020px) {
+    #drawer { transform:none; transition:none; }
+    #menu-btn, #scrim { display:none; }
+    body { padding-left:248px; }
+    .wrap { max-width:760px; }
+  }
   /* game card */
   .board { padding:8px 12px; }
   .game { background:var(--card); border-radius:11px; padding:12px 14px; margin-bottom:9px; }
@@ -433,6 +459,10 @@
     </div>
     <span class="mast-meta" id="nfl-sub"></span>
   </div>
+  <div class="pm-switch" style="padding-top:8px">
+    <button id="nfl-seg-games" class="pm-seg on">Games</button>
+    <button id="nfl-seg-props" class="pm-seg">Props</button>
+  </div>
   <div class="note" id="nfl-note" style="text-align:left">
     <h3>Preseason — display only</h3>
     These games are shown for following along. The model doesn't rate
@@ -440,6 +470,45 @@
     odds capture, and grading all start with Week 1 of the regular season.
   </div>
   <div class="board" id="nfl-board"></div>
+  <div class="board hide" id="nflp-board"></div>
+</div>
+
+<div class="wrap hide" id="view-founders">
+  <div class="mast">
+    <div style="display:flex;align-items:center;gap:12px">
+      <button class="back" id="fdHome">‹ Home</button>
+      <h1 class="logo" style="font-size:17px">Founders</h1>
+    </div>
+    <span class="mast-meta" id="fd-state"></span>
+  </div>
+  <div class="pad">
+    <div class="note" style="text-align:left">
+      <h3>The founders club</h3>
+      Slate's record stays public forever — that's the point of the project.
+      Founders fund the R&D wing and get it first: the player-prop research
+      lab (per-game markets, game logs, matchup splits) and the prop-edge
+      pilot when it ships. No promises, no commitments — just early access
+      and a say in what gets built next.
+    </div>
+    <div class="sport" id="fd-join">
+      <div class="sport-head"><span class="sport-name">Join</span></div>
+      <p class="sport-sub">Founders club is <b>$10 a month</b>. Venmo the month,
+      message me, and I'll send a personal code good through the end of your
+      paid period. When it lapses, renewing gets you a fresh one \u2014 no
+      auto-billing, ever.</p>
+      <p class="sport-cta">Venmo: @YOUR-VENMO-HANDLE</p>
+    </div>
+    <div class="sport" id="fd-unlock">
+      <div class="sport-head"><span class="sport-name">Have a code?</span></div>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <input id="fd-code" type="text" placeholder="access code" autocapitalize="off"
+          style="flex:1;padding:10px 12px;border-radius:10px;border:1px solid var(--line);
+          background:var(--navy);color:var(--ink);font-size:14px">
+        <button id="fd-go" class="pm-seg" style="flex:0 0 auto;padding:0 18px">Unlock</button>
+      </div>
+      <p class="sport-sub" id="fd-msg" style="min-height:16px;margin-top:8px"></p>
+    </div>
+  </div>
 </div>
 
 <div class="wrap hide" id="view-props-mlb">
@@ -462,6 +531,21 @@
     <button id="pm-k" class="pm-seg on">Strikeouts</button>
     <button id="pm-hits" class="pm-seg">Hits</button>
     <button id="pm-hr" class="pm-seg">Home runs</button>
+  </div>
+  <div id="pm-lock" class="pad hide">
+    <div class="note" style="text-align:left">
+      <h3>Founders early access</h3>
+      <p id="pm-lock-note" style="color:var(--amber);font-size:12.5px;margin:0 0 6px"></p>
+      The prop research lab — per-game strikeout, hit, and home-run
+      probabilities with game logs and matchup splits — is in founders
+      preview while it's being built. The main boards and the public record
+      stay free for everyone.
+    </div>
+    <div class="sport live" id="pm-lock-cta">
+      <div class="sport-head"><span class="sport-name">Become a founder</span></div>
+      <p class="sport-sub">Support the build, get the lab now.</p>
+      <p class="sport-cta">Join →</p>
+    </div>
   </div>
   <div class="board" id="pm-board"></div>
 </div>
@@ -568,15 +652,35 @@
 <button id="menu-btn" aria-label="Menu">☰</button>
 <div id="scrim"></div>
 <nav id="drawer">
-  <div class="dr-brand">SLATE</div>
-  <button class="dr-item" id="nav-home">⌂ Home</button>
+  <div class="dr-brand">SLATE<span class="dr-tag">graded in public</span></div>
+  <button class="dr-item" id="nav-home">
+    <svg viewBox="0 0 16 16"><path d="M8 1.5 1.5 7.5h2v7h3.5v-4h2v4h3.5v-7h2z"/></svg>
+    Home</button>
   <div class="dr-sec">MLB</div>
-  <button class="dr-item" id="nav-board">Board</button>
-  <button class="dr-item" id="nav-props-mlb">Props · strikeouts</button>
-  <button class="dr-item" id="nav-ev">Value check</button>
-  <button class="dr-item" id="nav-bt">Backtest</button>
+  <button class="dr-item" id="nav-board">
+    <svg viewBox="0 0 16 16"><path d="M1.5 2.5h13v3h-13zm0 4.5h13v3h-13zm0 4.5h13v3h-13z"/></svg>
+    Today's board</button>
+  <button class="dr-item" id="nav-props-mlb">
+    <svg viewBox="0 0 16 16"><path d="M2 14V8h2.5v6zm4.75 0V2h2.5v12zm4.75 0V5H14v9z"/></svg>
+    Player props</button>
+  <button class="dr-item" id="nav-ev">
+    <svg viewBox="0 0 16 16"><path d="M8 1.5v13M3 5l5-3.5L13 5M3 5c0 2 1 3 2.5 3S8 7 8 5M8 5c0 2 1 3 2.5 3S13 7 13 5" fill="none" stroke-width="1.4"/></svg>
+    Value check</button>
+  <button class="dr-item" id="nav-bt">
+    <svg viewBox="0 0 16 16"><path d="M8 2a6 6 0 1 1-4.2 1.7M8 5v3.5l2.5 1.5" fill="none" stroke-width="1.5"/></svg>
+    Backtest</button>
   <div class="dr-sec">NFL</div>
-  <button class="dr-item" id="nav-nfl">Scoreboard</button>
+  <button class="dr-item" id="nav-nfl">
+    <svg viewBox="0 0 16 16"><ellipse cx="8" cy="8" rx="6.5" ry="4.5" fill="none" stroke-width="1.4"/><path d="M5.5 8h5M6.8 6.8v2.4M9.2 6.8v2.4" fill="none" stroke-width="1.2"/></svg>
+    Games</button>
+  <button class="dr-item" id="nav-nfl-props">
+    <svg viewBox="0 0 16 16"><path d="M2 14V9h2.5v5zm4.75 0V4h2.5v10zm4.75 0V6.5H14V14z"/></svg>
+    Player props</button>
+  <div class="dr-sec">CLUB</div>
+  <button class="dr-item" id="nav-founders">
+    <svg viewBox="0 0 16 16"><path d="M8 1.5l1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.3l-3.8 2 .7-4.3-3.1-3 4.3-.6z"/></svg>
+    Founders</button>
+  <div class="dr-foot">Record public, free, forever.</div>
 </nav>
 
 <script>
@@ -786,14 +890,15 @@ async function pool(items, limit, fn) {
 }
 
 /* ---------- tabs ---------- */
-const VIEWS = ["home","board","ev","bt","nfl","props-mlb"];
-const HASHES = { home:"#home", board:"#mlb", ev:"#mlb/value", bt:"#mlb/backtest", nfl:"#nfl", "props-mlb":"#mlb/props" };
+const VIEWS = ["home","board","ev","bt","nfl","props-mlb","founders"];
+const HASHES = { home:"#home", board:"#mlb", ev:"#mlb/value", bt:"#mlb/backtest", nfl:"#nfl", "props-mlb":"#mlb/props", founders:"#founders" };
 function show(which, pushHash) {
   VIEWS.forEach(v => {
     document.getElementById("view-"+v).classList.toggle("hide", which !== v);
     const nav = document.getElementById("nav-"+v);
     if (nav) nav.classList.toggle("on", which === v);
   });
+  if (which === "nfl") syncNFLNav();
   closeDrawer();
   if (pushHash !== false && HASHES[which] && location.hash !== HASHES[which]) {
     history.pushState(null, "", HASHES[which]);
@@ -811,11 +916,32 @@ document.getElementById("nav-board").onclick = () => show("board");
 document.getElementById("nav-props-mlb").onclick = () => { show("props-mlb"); loadProps(); };
 document.getElementById("nav-ev").onclick = () => show("ev");
 document.getElementById("nav-bt").onclick = () => show("bt");
-document.getElementById("nav-nfl").onclick = () => { show("nfl"); loadNFL(); };
+document.getElementById("nav-nfl").onclick = () => { show("nfl"); setNFLSeg("games"); loadNFL(); };
+document.getElementById("nav-nfl-props").onclick = () => { show("nfl"); loadNFL(); setNFLSeg("props"); };
+document.getElementById("nav-founders").onclick = () => show("founders");
+function syncNFLNav(){
+  const g = document.getElementById("nav-nfl"), p = document.getElementById("nav-nfl-props");
+  if (g) g.classList.toggle("on", NFL_SEG === "games");
+  if (p) p.classList.toggle("on", NFL_SEG === "props");
+}
+function setNFLSeg(m){
+  NFL_SEG = m;
+  document.getElementById("nfl-seg-games").classList.toggle("on", m === "games");
+  document.getElementById("nfl-seg-props").classList.toggle("on", m === "props");
+  document.getElementById("nfl-board").classList.toggle("hide", m !== "games");
+  document.getElementById("nflp-board").classList.toggle("hide", m !== "props");
+  if (m === "props") loadNFLProps();
+  syncNFLNav();
+}
+document.getElementById("nfl-seg-games").onclick = () => setNFLSeg("games");
+document.getElementById("nfl-seg-props").onclick = () => setNFLSeg("props");
 document.getElementById("go-mlb").onclick = () => show("board");
 document.getElementById("go-nfl").onclick = () => { show("nfl"); loadNFL(); };
 document.getElementById("go-props").onclick = () => { show("props-mlb"); loadProps(); };
 document.getElementById("pmBack").onclick = () => show("board");
+document.getElementById("fdHome").onclick = () => show("home");
+document.getElementById("fd-go").onclick = tryUnlock;
+document.getElementById("pm-lock-cta").onclick = () => show("founders");
 ["k","hits","hr"].forEach(m => {
   document.getElementById("pm-" + m).onclick = () => setPMMode(m);
 });
@@ -823,7 +949,8 @@ document.getElementById("nflHome").onclick = () => show("home");
 document.getElementById("toHome").onclick = () => show("home");
 function route() {
   const h = location.hash;
-  if (h.startsWith("#mlb/props") || h.startsWith("#props")) { show("props-mlb", false); loadProps(); }
+  if (h.startsWith("#founders")) show("founders", false);
+  else if (h.startsWith("#mlb/props") || h.startsWith("#props")) { show("props-mlb", false); loadProps(); }
   else if (h.startsWith("#nfl")) { show("nfl", false); loadNFL(); }
   else if (h.startsWith("#mlb/value")) show("ev", false);
   else if (h.startsWith("#mlb/backtest")) show("bt", false);
@@ -991,6 +1118,8 @@ async function loadPropsQuiet(){
   } catch (e) {}
 }
 async function loadProps(){
+  syncFounderUI();
+  if (!IS_FOUNDER) return;
   if (Date.now() - PROPS_LOADED < 60000) return;
   const board = document.getElementById("pm-board");
   if (!PROPS_LOADED) board.innerHTML = '<div class="note">Loading tonight\u2019s starters\u2026</div>';
@@ -1007,6 +1136,63 @@ async function loadProps(){
       + 'Projections publish with the morning score run (7 AM ET). '
       + esc(String(e.message || e)) + '</div>';
   }
+}
+/* ---------- founders gate ----------
+   Codes live only as SHA-256 hashes; each friend gets their own so one
+   can be revoked without resetting everyone. Client-side = honor lock,
+   good enough for a friends beta, not for strangers. */
+const FOUNDER_KEYS = [
+  {h: "0a44b2c0e5fb51537aa1043e20f699aec709107c33633eee9c66fa87795ea1b0", until: "2099-12-31"}
+];
+function founderUntil(){
+  return localStorage.getItem("slate-founder-until") || "";
+}
+function founderActive(){
+  const u = founderUntil();
+  return !!u && u >= new Date().toISOString().slice(0, 10);
+}
+let IS_FOUNDER = founderActive();
+async function sha256(s){
+  const b = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s.trim().toLowerCase()));
+  return Array.from(new Uint8Array(b)).map(x => x.toString(16).padStart(2, "0")).join("");
+}
+async function tryUnlock(){
+  const code = document.getElementById("fd-code").value;
+  const msg = document.getElementById("fd-msg");
+  if (!code) { msg.textContent = "Enter the code you were sent."; return; }
+  const h = await sha256(code);
+  const key = FOUNDER_KEYS.find(k => k.h === h);
+  if (key) {
+    if (key.until < new Date().toISOString().slice(0, 10)) {
+      msg.textContent = "That code has expired \u2014 renew on Venmo for a fresh one.";
+      return;
+    }
+    localStorage.setItem("slate-founder-until", key.until);
+    IS_FOUNDER = true;
+    msg.textContent = "Welcome, founder \u2014 active through " + key.until + ".";
+    syncFounderUI();
+  } else {
+    msg.textContent = "That code didn't match \u2014 check for typos.";
+  }
+}
+function syncFounderUI(){
+  IS_FOUNDER = founderActive();
+  const st = document.getElementById("fd-state");
+  if (st) st.textContent = IS_FOUNDER
+    ? "\u2713 Founder \u00b7 thru " + founderUntil() : "";
+  const lockNote = document.getElementById("pm-lock-note");
+  if (lockNote) {
+    const u = founderUntil();
+    lockNote.textContent = (u && !IS_FOUNDER)
+      ? "Your founders access lapsed on " + u + " \u2014 renew below to jump back in."
+      : "";
+  }
+  const lock = document.getElementById("pm-lock");
+  const board = document.getElementById("pm-board");
+  const sw = document.querySelector(".pm-switch");
+  if (lock) lock.classList.toggle("hide", IS_FOUNDER);
+  if (board) board.classList.toggle("hide", !IS_FOUNDER);
+  if (sw) sw.classList.toggle("hide", !IS_FOUNDER);
 }
 let PM_MODE = "k";
 function setPMMode(m){
@@ -1116,6 +1302,80 @@ function renderProps(d){
 /* ---------- NFL scoreboard (display only; never touches the ledger) ---------- */
 const NFL_API = "https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard";
 const NFL_ODDS_URL = "https://StayOccupiedVR.github.io/slate-lab/nfl-odds.json";
+const NFL_PRED_URL = "https://StayOccupiedVR.github.io/slate-lab/nfl-predictions.json";
+const NFL_PROPS_URL = "https://StayOccupiedVR.github.io/slate-lab/nfl-props.json";
+let NFL_PRED = {};       // "AWY-HME" -> {p_away, proj_home_margin, revised}
+let NFL_PROPS_DOC = null;
+let NFL_SEG = "games";
+async function loadNFLPred(){
+  try{
+    const r = await fetch(NFL_PRED_URL + "?t=" + Date.now());
+    if(!r.ok) return;
+    const d = await r.json();
+    (d.games||[]).forEach(g => { NFL_PRED[g.away+"-"+g.home] =
+      {p: g.p_away, margin: g.proj_home_margin, revised: g.revised}; });
+  }catch(e){}
+}
+async function loadNFLProps(){
+  const board = document.getElementById("nflp-board");
+  try{
+    const r = await fetch(NFL_PROPS_URL + "?t=" + Date.now());
+    if(!r.ok) throw new Error(String(r.status));
+    NFL_PROPS_DOC = await r.json();
+    renderNFLProps(NFL_PROPS_DOC);
+  }catch(e){
+    board.innerHTML = '<div class="note">Player projections publish with the '
+      + 'Wednesday filing once the season starts. The models are validated '
+      + 'and waiting \u2014 quantile coverage within ~3 points on three '
+      + 'holdout seasons.</div>';
+  }
+}
+function yardBand(d){
+  // q25-q75 band with the median tick, scaled to q90 of this player
+  const max = Math.max(d.q["90"], 1);
+  const l = 100 * d.q["25"] / max, r = 100 * d.q["75"] / max,
+        m = 100 * d.q["50"] / max;
+  return '<div class="yb"><div class="yb-band" style="left:' + l.toFixed(0)
+    + '%;width:' + Math.max(2, (r - l)).toFixed(0) + '%"></div>'
+    + '<div class="yb-med" style="left:' + m.toFixed(0) + '%"></div></div>';
+}
+function renderNFLProps(d){
+  const board = document.getElementById("nflp-board");
+  const games = d.games || [];
+  if (!games.length){
+    board.innerHTML = '<div class="note">No games in this week\u2019s projection window.</div>';
+    return;
+  }
+  board.innerHTML = games.map(g =>
+    '<article class="game"><div class="g-head"><span class="g-when">'
+    + esc(g.away) + ' @ ' + esc(g.home) + '</span><span class="g-venue">Week '
+    + d.week + ' yardage</span></div>'
+    + (g.players || []).map(p => {
+        const mk = p.rec_yards ? ["rec_yards", "rec yds"] : ["rush_yards", "rush yds"];
+        const dd = p[mk[0]];
+        return '<details class="bt-det"><summary><div class="bt-row">'
+          + '<div class="bt-who"><div class="bt-name">' + esc(p.name)
+          + ' <small style="color:var(--ink-3)">' + esc(p.pos) + ' \u00b7 '
+          + esc(p.team) + '</small></div>'
+          + yardBand(dd) + '</div>'
+          + '<div class="bt-cell">' + dd.q["50"].toFixed(0) + '<small>MED ' + mk[1] + '</small></div>'
+          + '<div class="bt-cell' + ((dd.over["50"] >= 0.5) ? " bt-hot" : "") + '">'
+          + Math.round(100 * dd.over["50"]) + '%<small>O50</small></div>'
+          + '</div></summary>'
+          + '<div class="pm-split"><span>Range (q25\u2013q75)</span><b>'
+          + dd.q["25"].toFixed(0) + '\u2013' + dd.q["75"].toFixed(0) + '</b>'
+          + '<small>' + dd.n_prior + ' recent games</small></div>'
+          + '<div class="pm-split"><span>Over 25 / 75 / 100</span><b>'
+          + Math.round(100 * dd.over["25"]) + '% / ' + Math.round(100 * dd.over["75"])
+          + '% / ' + Math.round(100 * dd.over["100"]) + '%</b></div>'
+          + (p.rec_yards && p.rush_yards
+              ? '<div class="pm-split"><span>Rush yds median</span><b>'
+                + p.rush_yards.q["50"].toFixed(0) + '</b></div>' : '')
+          + '</details>';
+      }).join("")
+    + '</article>').join("");
+}
+
 const NFL_ODDS = {};   // "AWY-HME" (nflverse codes) -> {books:{...}}
 const ESPN_ALIAS = { WSH:"WAS", LAR:"LA" };   // ESPN code -> nflverse code
 const nflCode = ab => ESPN_ALIAS[ab] || ab;
@@ -1138,6 +1398,7 @@ async function loadNFL(){
     const d = await r.json();
     NFL_LOADED = Date.now();
     await loadNFLOdds();
+    await loadNFLPred();
     renderNFL(d);
   } catch (e) {
     board.innerHTML = '<div class="note err"><h3>Couldn\u2019t load NFL games</h3>'
@@ -1179,10 +1440,21 @@ function renderNFL(d){
     else if (final) head = '<span class="g-when">Final</span>';
     else head = '<span class="g-when">'+esc(clock(ev.date))+'</span>';
     const oKey = nflCode(away.team?.abbreviation) + "-" + nflCode(home.team?.abbreviation);
+    const pred = NFL_PRED[oKey];
+    const modelRow = (pred && !live && !final)
+      ? '<div class="odds-tbl" style="border-top:0;padding-top:2px">'
+        + '<div class="pm-split"><span>Model</span><b>'
+        + esc(pred.margin >= 0 ? nflCode(home.team?.abbreviation) : nflCode(away.team?.abbreviation))
+        + " by " + Math.abs(pred.margin).toFixed(1) + '</b>'
+        + '<small>' + Math.round(100 * (pred.p >= 0.5 ? pred.p : 1 - pred.p))
+        + "% " + (pred.p >= 0.5 ? "away" : "home")
+        + (pred.revised ? " \u00b7 QB-revised" : "") + '</small></div></div>'
+      : "";
     return '<article class="game">'
       + '<div class="g-head">'+head
       + '<span class="g-venue">'+esc(cp.venue?.fullName || "")+'</span></div>'
       + row(away, false) + row(home, false)
+      + modelRow
       + oddsTable(NFL_ODDS[oKey],
           away.team?.abbreviation || "", home.team?.abbreviation || "",
           live || final)
@@ -1202,15 +1474,24 @@ function oddsTable(o, abA, abH, hide){
   if (hide || !o || !o.books || !Object.keys(o.books).length) return "";
   const rows = BOOK_LIST.filter(([k]) => o.books[k]);
   if (!rows.length) return "";
+  const hasSpread = rows.some(([k]) => o.books[k].spread_home != null);
   const bestA = Math.max(...rows.map(([k]) => o.books[k].ml_away));
   const bestH = Math.max(...rows.map(([k]) => o.books[k].ml_home));
   const cell = (v, best) => '<span class="ov'+(v===best?' ov-best':'')+'">'+fmtML(v)+'</span>';
-  return '<div class="odds-tbl">'
-    + '<div class="ot-head"><span>ODDS</span><span>'+abA+'</span><span>'+abH+'</span></div>'
+  const spCell = k => {
+    if (!hasSpread) return "";
+    const v = o.books[k].spread_home;
+    return '<span class="ov">' + (v == null ? "\u2013"
+      : (v > 0 ? "+" : "") + v) + '</span>';
+  };
+  return '<div class="odds-tbl'+(hasSpread?' ot-4col':'')+'">'
+    + '<div class="ot-head"><span>ODDS</span><span>'+abA+'</span><span>'+abH+'</span>'
+    + (hasSpread ? '<span>SPRD</span>' : '') + '</div>'
     + rows.map(([k,name]) =>
         '<div class="ot-row"><span class="ot-bk">'+name+'</span>'
         + cell(o.books[k].ml_away, bestA)
         + cell(o.books[k].ml_home, bestH)
+        + spCell(k)
         + '</div>').join('')
     + '<div class="ot-note">Green = best price available right now</div>'
     + '</div>';
