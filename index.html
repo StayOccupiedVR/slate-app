@@ -1168,7 +1168,12 @@ async function loadProps(){
    can be revoked without resetting everyone. Client-side = honor lock,
    good enough for a friends beta, not for strangers. */
 const FOUNDER_KEYS = [
-  {h: "0a44b2c0e5fb51537aa1043e20f699aec709107c33633eee9c66fa87795ea1b0", until: "2099-12-31"}
+  {h: "5a2c82ebba9880ee86d1abb26ba21502cb9700153b5a146ad976338140422c4c", until: "2026-10-13"},
+  {h: "3e3d67d4fea0d572ef641175fb21c1972aab960151a697c7f3283723a7103f4b", until: "2026-10-13"},
+  {h: "3628c05e0992d44f211835b27a3d8b778623a948320b7ea85e5cce5dc64d8ed2", until: "2026-10-13"},
+  {h: "f2846af4b7e5e616b7f5773230cc169a2dcfa600447ab50862e388379e0564fd", until: "2026-10-13"},
+  {h: "fc72c3c2e0931c299e2403b878bb4167c6df5c0d547b7d5958162e62861177fc", until: "2026-10-13"},
+  {h: "0a44b2c0e5fb51537aa1043e20f699aec709107c33633eee9c66fa87795ea1b0", until: "2020-01-01"}
 ];
 function founderUntil(){
   return localStorage.getItem("slate-founder-until") || "";
