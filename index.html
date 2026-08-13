@@ -1346,31 +1346,52 @@ function renderNFLProps(d){
     board.innerHTML = '<div class="note">No games in this week\u2019s projection window.</div>';
     return;
   }
+  const MKT = {
+    pass_yards:   "Pass yds",
+    completions:  "Completions",
+    pass_att:     "Pass att",
+    rush_yards:   "Rush yds",
+    rush_att:     "Rush att",
+    rush_rec_yds: "Rush+rec yds",
+    rec_yards:    "Rec yds",
+  };
+  const primaryOf = p => p.pos === "QB" ? "pass_yards"
+    : p.pos === "RB" ? "rush_yards" : "rec_yards";
   board.innerHTML = games.map(g =>
     '<article class="game"><div class="g-head"><span class="g-when">'
     + esc(g.away) + ' @ ' + esc(g.home) + '</span><span class="g-venue">Week '
-    + d.week + ' yardage</span></div>'
+    + d.week + ' props</span></div>'
     + (g.players || []).map(p => {
-        const mk = p.rec_yards ? ["rec_yards", "rec yds"] : ["rush_yards", "rush yds"];
-        const dd = p[mk[0]];
+        const pk = primaryOf(p);
+        const dd = p[pk] || p.rec_yards || p.rush_yards || p.pass_yards;
+        if (!dd) return "";
+        const rows = Object.keys(MKT).filter(k => p[k]).map(k => {
+          const m = p[k];
+          return '<div class="pm-split"><span>' + MKT[k] + '</span><b>'
+            + m.q["50"].toFixed(0) + '</b><small>q25\u2013q75 '
+            + m.q["25"].toFixed(0) + '\u2013' + m.q["75"].toFixed(0)
+            + '</small></div>';
+        }).join("");
+        const rec = p.receptions
+          ? '<div class="pm-split"><span>Receptions</span><b>'
+            + p.receptions.mean.toFixed(1) + '</b><small>3+ '
+            + Math.round(100 * (p.receptions.over["2.5"] ?? 0)) + '% \u00b7 4+ '
+            + Math.round(100 * (p.receptions.over["3.5"] ?? 0)) + '% \u00b7 5+ '
+            + Math.round(100 * (p.receptions.over["4.5"] ?? 0)) + '%</small></div>'
+          : "";
         return '<details class="bt-det"><summary><div class="bt-row">'
           + '<div class="bt-who"><div class="bt-name">' + esc(p.name)
           + ' <small style="color:var(--ink-3)">' + esc(p.pos) + ' \u00b7 '
           + esc(p.team) + '</small></div>'
           + yardBand(dd) + '</div>'
-          + '<div class="bt-cell">' + dd.q["50"].toFixed(0) + '<small>MED ' + mk[1] + '</small></div>'
+          + '<div class="bt-cell">' + dd.q["50"].toFixed(0) + '<small>MED '
+          + (MKT[pk] || "yds").toUpperCase() + '</small></div>'
           + '<div class="bt-cell' + ((dd.over["50"] >= 0.5) ? " bt-hot" : "") + '">'
           + Math.round(100 * dd.over["50"]) + '%<small>O50</small></div>'
           + '</div></summary>'
-          + '<div class="pm-split"><span>Range (q25\u2013q75)</span><b>'
-          + dd.q["25"].toFixed(0) + '\u2013' + dd.q["75"].toFixed(0) + '</b>'
-          + '<small>' + dd.n_prior + ' recent games</small></div>'
-          + '<div class="pm-split"><span>Over 25 / 75 / 100</span><b>'
-          + Math.round(100 * dd.over["25"]) + '% / ' + Math.round(100 * dd.over["75"])
-          + '% / ' + Math.round(100 * dd.over["100"]) + '%</b></div>'
-          + (p.rec_yards && p.rush_yards
-              ? '<div class="pm-split"><span>Rush yds median</span><b>'
-                + p.rush_yards.q["50"].toFixed(0) + '</b></div>' : '')
+          + rows + rec
+          + '<div class="pm-split"><span>History</span><b>' + dd.n_prior
+          + '</b><small>recent games in pool</small></div>'
           + '</details>';
       }).join("")
     + '</article>').join("");
