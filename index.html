@@ -473,6 +473,17 @@
   <div class="board hide" id="nflp-board"></div>
 </div>
 
+<div class="wrap hide" id="view-nfl-bt">
+  <div class="mast">
+    <div style="display:flex;align-items:center;gap:12px">
+      <button class="back" id="nbtBack">‹ NFL</button>
+      <h1 class="logo" style="font-size:17px">NFL backtest</h1>
+    </div>
+    <span class="mast-meta" id="nbt-sub"></span>
+  </div>
+  <div class="board" id="nbt-board"><div class="note">Loading receipts…</div></div>
+</div>
+
 <div class="wrap hide" id="view-founders">
   <div class="mast">
     <div style="display:flex;align-items:center;gap:12px">
@@ -676,6 +687,9 @@
   <button class="dr-item" id="nav-nfl-props">
     <svg viewBox="0 0 16 16"><path d="M2 14V9h2.5v5zm4.75 0V4h2.5v10zm4.75 0V6.5H14V14z"/></svg>
     Player props</button>
+  <button class="dr-item" id="nav-nfl-bt">
+    <svg viewBox="0 0 16 16"><path d="M8 2a6 6 0 1 1-4.2 1.7M8 5v3.5l2.5 1.5" fill="none" stroke-width="1.5"/></svg>
+    Backtest</button>
   <div class="dr-sec">CLUB</div>
   <button class="dr-item" id="nav-founders">
     <svg viewBox="0 0 16 16"><path d="M8 1.5l1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.3l-3.8 2 .7-4.3-3.1-3 4.3-.6z"/></svg>
@@ -890,8 +904,8 @@ async function pool(items, limit, fn) {
 }
 
 /* ---------- tabs ---------- */
-const VIEWS = ["home","board","ev","bt","nfl","props-mlb","founders"];
-const HASHES = { home:"#home", board:"#mlb", ev:"#mlb/value", bt:"#mlb/backtest", nfl:"#nfl", "props-mlb":"#mlb/props", founders:"#founders" };
+const VIEWS = ["home","board","ev","bt","nfl","props-mlb","founders","nfl-bt"];
+const HASHES = { home:"#home", board:"#mlb", ev:"#mlb/value", bt:"#mlb/backtest", nfl:"#nfl", "props-mlb":"#mlb/props", founders:"#founders", "nfl-bt":"#nfl/backtest" };
 function show(which, pushHash) {
   VIEWS.forEach(v => {
     document.getElementById("view-"+v).classList.toggle("hide", which !== v);
@@ -918,6 +932,8 @@ document.getElementById("nav-ev").onclick = () => show("ev");
 document.getElementById("nav-bt").onclick = () => show("bt");
 document.getElementById("nav-nfl").onclick = () => { show("nfl"); setNFLSeg("games"); loadNFL(); };
 document.getElementById("nav-nfl-props").onclick = () => { show("nfl"); loadNFL(); setNFLSeg("props"); };
+document.getElementById("nav-nfl-bt").onclick = () => { show("nfl-bt"); loadNFLBT(); };
+document.getElementById("nbtBack").onclick = () => { show("nfl"); loadNFL(); };
 document.getElementById("nav-founders").onclick = () => show("founders");
 function syncNFLNav(){
   const g = document.getElementById("nav-nfl"), p = document.getElementById("nav-nfl-props");
@@ -951,6 +967,7 @@ function route() {
   const h = location.hash;
   if (h.startsWith("#founders")) show("founders", false);
   else if (h.startsWith("#mlb/props") || h.startsWith("#props")) { show("props-mlb", false); loadProps(); }
+  else if (h.startsWith("#nfl/backtest")) { show("nfl-bt", false); loadNFLBT(); }
   else if (h.startsWith("#nfl")) { show("nfl", false); loadNFL(); }
   else if (h.startsWith("#mlb/value")) show("ev", false);
   else if (h.startsWith("#mlb/backtest")) show("bt", false);
@@ -1338,6 +1355,60 @@ function yardBand(d){
   return '<div class="yb"><div class="yb-band" style="left:' + l.toFixed(0)
     + '%;width:' + Math.max(2, (r - l)).toFixed(0) + '%"></div>'
     + '<div class="yb-med" style="left:' + m.toFixed(0) + '%"></div></div>';
+}
+let NBT_DOC = null;
+async function loadNFLBT(){
+  if (NBT_DOC) { renderNFLBT(NBT_DOC); return; }
+  try{
+    const r = await fetch("nfl-backtest.json?v=1");
+    if(!r.ok) throw new Error(String(r.status));
+    NBT_DOC = await r.json();
+    renderNFLBT(NBT_DOC);
+  }catch(e){
+    document.getElementById("nbt-board").innerHTML =
+      '<div class="note">Backtest report not found in this deploy.</div>';
+  }
+}
+function nbtTable(head, rows){
+  return '<table class="pm-log"><tr>' + head.map(h => "<th>"+h+"</th>").join("")
+    + "</tr>" + rows.map(r => "<tr>" + r.map(c => "<td>"+c+"</td>").join("") + "</tr>").join("")
+    + "</table>";
+}
+function renderNFLBT(d){
+  document.getElementById("nbt-sub").textContent = "walk-forward \u00b7 3 holdout seasons";
+  const MKT_NAMES = {rec_yards:"Rec yds", rush_yards:"Rush yds",
+    rush_rec_yds:"Rush+rec yds", rush_att:"Rush att", pass_yards:"Pass yds",
+    completions:"Completions", pass_att:"Pass att"};
+  let h = '<article class="game"><div class="g-head"><span class="g-when">Game winner (moneyline)</span><span class="g-venue">vs closing lines</span></div>'
+    + nbtTable(["Season","N","Accuracy","Our logloss","Market"],
+        d.moneyline.map(r => [r.season, r.n, (100*r.acc).toFixed(1)+"%", r.logloss.toFixed(4), r.market_logloss.toFixed(4)]))
+    + '<p class="bt-match" style="padding-top:6px">Lower logloss is better. The closing line is the hardest benchmark in sports \u2014 tracking within a few hundredths of it with public data is the honest result, and it\u2019s graded live weekly in season.</p>'
+    + '</article>';
+  h += '<article class="game"><div class="g-head"><span class="g-when">Projected margin</span><span class="g-venue">vs closing spread</span></div>'
+    + nbtTable(["Season","Our MAE","Spread MAE"],
+        d.margin.map(r => [r.season, r.margin_mae, r.market_margin_mae]))
+    + '<p class="bt-match" style="padding-top:6px">' + esc(d.spread_note) + '</p></article>';
+  const seasons = [2023, 2024, 2025];
+  h += '<article class="game"><div class="g-head"><span class="g-when">Player props \u2014 quantile coverage</span><span class="g-venue">targets 10/25/50/75/90%</span></div>';
+  for (const mk of Object.keys(d.props_cont)) {
+    const rows = d.props_cont[mk].map(r =>
+      [r.season, r.n, r.q10+"%", r.q25+"%", r.q50+"%", r.q75+"%", r.q90+"%"]);
+    h += '<div class="pm-split" style="padding-top:8px"><span><b>' + (MKT_NAMES[mk]||mk) + '</b></span></div>'
+      + nbtTable(["Season","N","q10","q25","q50","q75","q90"], rows);
+  }
+  h += '<p class="bt-match" style="padding-top:6px">If the model says q50, reality should land under it 50% of the time. All markets sit within a few points of nominal at every mark.</p></article>';
+  h += '<article class="game"><div class="g-head"><span class="g-when">Receptions</span><span class="g-venue">negative binomial vs Poisson</span></div>'
+    + nbtTable(["Season","N","alpha","NB log","Poisson log"],
+        d.receptions.map(r => [r.season, r.n, r.alpha, r.nb_log.toFixed(4), r.poisson_log.toFixed(4)]))
+    + '<div class="pm-split" style="padding-top:6px"><span>P(4+ catches) calibration, 2025</span></div>'
+    + nbtTable(["Predicted","Actual","N"],
+        (d.receptions[2]?.p4_buckets||[]).map(b => [b.pred+"%", b.hit+"%", b.n]))
+    + '</article>';
+  h += '<article class="game"><div class="g-head"><span class="g-when">Benched markets</span><span class="g-venue">tested, not shipped</span></div>'
+    + d.benched.map(b => '<div class="pm-split"><span><b>' + esc(b.market) + '</b></span></div>'
+        + '<p class="bt-match" style="padding:2px 0 8px">' + esc(b.why) + '</p>').join("")
+    + '<p class="bt-match">Benching with evidence is the product: what ships has receipts, what doesn\u2019t ship has reasons.</p></article>';
+  document.getElementById("nbt-board").innerHTML = h;
 }
 function renderNFLProps(d){
   const board = document.getElementById("nflp-board");

@@ -1,0 +1,371 @@
+{
+ "generated": "2026-08-12",
+ "model": "nfl-v1",
+ "moneyline": [
+  {
+   "season": 2023,
+   "n": 224,
+   "acc": 0.612,
+   "logloss": 0.6488,
+   "market_logloss": 0.621,
+   "market_n": 224
+  },
+  {
+   "season": 2024,
+   "n": 224,
+   "acc": 0.692,
+   "logloss": 0.6029,
+   "market_logloss": 0.5562,
+   "market_n": 224
+  },
+  {
+   "season": 2025,
+   "n": 224,
+   "acc": 0.598,
+   "logloss": 0.6324,
+   "market_logloss": 0.6198,
+   "market_n": 224
+  }
+ ],
+ "margin": [
+  {
+   "season": 2023,
+   "margin_mae": 10.38,
+   "market_margin_mae": 9.79
+  },
+  {
+   "season": 2024,
+   "margin_mae": 9.83,
+   "market_margin_mae": 9.28
+  },
+  {
+   "season": 2025,
+   "margin_mae": 10.35,
+   "market_margin_mae": 9.92
+  }
+ ],
+ "spread_note": "Cover probabilities were tested and REJECTED: log loss .71-.73 vs the .693 coin baseline on all three holdouts; ATS 45-54% at every threshold. Slate displays margins and grades their MAE publicly, and does not sell cover picks.",
+ "props_cont": {
+  "rec_yards": [
+   {
+    "season": 2023,
+    "n": 3604,
+    "q10": 14.7,
+    "q25": 27.9,
+    "q50": 53.8,
+    "q75": 78.3,
+    "q90": 90.6
+   },
+   {
+    "season": 2024,
+    "n": 3604,
+    "q10": 13.3,
+    "q25": 26.2,
+    "q50": 51.2,
+    "q75": 75.8,
+    "q90": 91.0
+   },
+   {
+    "season": 2025,
+    "n": 3560,
+    "q10": 15.1,
+    "q25": 27.0,
+    "q50": 53.5,
+    "q75": 78.2,
+    "q90": 90.7
+   }
+  ],
+  "rush_yards": [
+   {
+    "season": 2023,
+    "n": 703,
+    "q10": 13.5,
+    "q25": 29.4,
+    "q50": 55.2,
+    "q75": 78.9,
+    "q90": 90.9
+   },
+   {
+    "season": 2024,
+    "n": 716,
+    "q10": 12.7,
+    "q25": 27.7,
+    "q50": 49.4,
+    "q75": 72.6,
+    "q90": 86.7
+   },
+   {
+    "season": 2025,
+    "n": 722,
+    "q10": 11.5,
+    "q25": 25.5,
+    "q50": 53.6,
+    "q75": 78.1,
+    "q90": 89.1
+   }
+  ],
+  "rush_rec_yds": [
+   {
+    "season": 2023,
+    "n": 847,
+    "q10": 11.8,
+    "q25": 29.0,
+    "q50": 54.5,
+    "q75": 78.3,
+    "q90": 90.7
+   },
+   {
+    "season": 2024,
+    "n": 856,
+    "q10": 11.6,
+    "q25": 25.8,
+    "q50": 49.4,
+    "q75": 72.7,
+    "q90": 88.3
+   },
+   {
+    "season": 2025,
+    "n": 840,
+    "q10": 9.6,
+    "q25": 26.4,
+    "q50": 53.6,
+    "q75": 77.0,
+    "q90": 88.5
+   }
+  ],
+  "rush_att": [
+   {
+    "season": 2023,
+    "n": 703,
+    "q10": 13.2,
+    "q25": 28.0,
+    "q50": 53.3,
+    "q75": 74.8,
+    "q90": 89.3
+   },
+   {
+    "season": 2024,
+    "n": 716,
+    "q10": 15.4,
+    "q25": 28.6,
+    "q50": 51.5,
+    "q75": 74.6,
+    "q90": 87.2
+   },
+   {
+    "season": 2025,
+    "n": 722,
+    "q10": 13.3,
+    "q25": 26.5,
+    "q50": 54.7,
+    "q75": 78.9,
+    "q90": 90.4
+   }
+  ],
+  "pass_yards": [
+   {
+    "season": 2023,
+    "n": 456,
+    "q10": 15.4,
+    "q25": 27.4,
+    "q50": 50.2,
+    "q75": 73.0,
+    "q90": 89.0
+   },
+   {
+    "season": 2024,
+    "n": 501,
+    "q10": 13.0,
+    "q25": 29.7,
+    "q50": 54.5,
+    "q75": 77.0,
+    "q90": 89.8
+   },
+   {
+    "season": 2025,
+    "n": 484,
+    "q10": 12.4,
+    "q25": 27.7,
+    "q50": 51.9,
+    "q75": 77.5,
+    "q90": 89.7
+   }
+  ],
+  "completions": [
+   {
+    "season": 2023,
+    "n": 456,
+    "q10": 14.9,
+    "q25": 29.8,
+    "q50": 51.3,
+    "q75": 76.3,
+    "q90": 88.8
+   },
+   {
+    "season": 2024,
+    "n": 501,
+    "q10": 11.4,
+    "q25": 28.9,
+    "q50": 52.3,
+    "q75": 78.6,
+    "q90": 90.4
+   },
+   {
+    "season": 2025,
+    "n": 484,
+    "q10": 13.0,
+    "q25": 31.0,
+    "q50": 56.2,
+    "q75": 79.5,
+    "q90": 91.1
+   }
+  ],
+  "pass_att": [
+   {
+    "season": 2023,
+    "n": 456,
+    "q10": 13.8,
+    "q25": 28.1,
+    "q50": 53.5,
+    "q75": 75.9,
+    "q90": 89.5
+   },
+   {
+    "season": 2024,
+    "n": 501,
+    "q10": 14.0,
+    "q25": 28.9,
+    "q50": 53.1,
+    "q75": 79.0,
+    "q90": 90.4
+   },
+   {
+    "season": 2025,
+    "n": 484,
+    "q10": 13.4,
+    "q25": 30.0,
+    "q50": 56.2,
+    "q75": 78.5,
+    "q90": 89.0
+   }
+  ]
+ },
+ "receptions": [
+  {
+   "season": 2023,
+   "n": 3604,
+   "alpha": 0.068,
+   "nb_log": 1.8996,
+   "poisson_log": 1.9111,
+   "p4_buckets": [
+    {
+     "pred": 10,
+     "hit": 10,
+     "n": 1407
+    },
+    {
+     "pred": 30,
+     "hit": 25,
+     "n": 846
+    },
+    {
+     "pred": 49,
+     "hit": 44,
+     "n": 670
+    },
+    {
+     "pred": 69,
+     "hit": 64,
+     "n": 481
+    },
+    {
+     "pred": 85,
+     "hit": 86,
+     "n": 200
+    }
+   ]
+  },
+  {
+   "season": 2024,
+   "n": 3604,
+   "alpha": 0.064,
+   "nb_log": 1.9405,
+   "poisson_log": 1.9504,
+   "p4_buckets": [
+    {
+     "pred": 10,
+     "hit": 12,
+     "n": 1483
+    },
+    {
+     "pred": 30,
+     "hit": 29,
+     "n": 908
+    },
+    {
+     "pred": 49,
+     "hit": 45,
+     "n": 592
+    },
+    {
+     "pred": 69,
+     "hit": 70,
+     "n": 467
+    },
+    {
+     "pred": 85,
+     "hit": 79,
+     "n": 154
+    }
+   ]
+  },
+  {
+   "season": 2025,
+   "n": 3560,
+   "alpha": 0.069,
+   "nb_log": 1.8974,
+   "poisson_log": 1.9019,
+   "p4_buckets": [
+    {
+     "pred": 9,
+     "hit": 9,
+     "n": 1316
+    },
+    {
+     "pred": 29,
+     "hit": 23,
+     "n": 923
+    },
+    {
+     "pred": 49,
+     "hit": 44,
+     "n": 633
+    },
+    {
+     "pred": 69,
+     "hit": 62,
+     "n": 547
+    },
+    {
+     "pred": 86,
+     "hit": 87,
+     "n": 141
+    }
+   ]
+  }
+ ],
+ "benched": [
+  {
+   "market": "pass_tds",
+   "why": "2025 calibration overconfident both directions (34->46, 67->56); inconsistent across seasons. Revisit as TD-rate-per-attempt."
+  },
+  {
+   "market": "ints",
+   "why": "NB ties/loses to Poisson; 2023 bucket 33->55. ~0.5/game is too thin for a 16-game window."
+  },
+  {
+   "market": "any_td",
+   "why": "NB worse than Poisson on all three seasons and hot (48->38). Needs a red-zone opportunity model, planned as v2."
+  }
+ ]
+}
