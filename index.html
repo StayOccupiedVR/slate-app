@@ -528,6 +528,24 @@
       </div>
       <p class="sport-sub" id="fd-msg" style="min-height:16px;margin-top:8px"></p>
     </div>
+    <div class="sport hide" id="fd-register">
+      <div class="sport-head"><span class="sport-name">Register your pass</span></div>
+      <p class="sport-sub">Optional, 10 seconds: put a name on your pass so
+      renewals reach you and your referrer gets credit.</p>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px">
+        <input id="reg-name" type="text" placeholder="name" autocapitalize="words"
+          style="padding:10px 12px;border-radius:10px;border:1px solid var(--line);
+          background:var(--navy);color:var(--ink);font-size:14px">
+        <input id="reg-email" type="email" placeholder="email" autocapitalize="off"
+          style="padding:10px 12px;border-radius:10px;border:1px solid var(--line);
+          background:var(--navy);color:var(--ink);font-size:14px">
+        <div style="display:flex;gap:8px;align-items:center">
+          <span class="sport-sub" style="flex:1" id="reg-code-show"></span>
+          <button id="reg-go" class="pm-seg" style="flex:0 0 auto;padding:8px 18px">Register</button>
+        </div>
+      </div>
+      <p class="sport-sub" id="reg-msg" style="min-height:16px;margin-top:8px"></p>
+    </div>
   </div>
 </div>
 
@@ -966,6 +984,7 @@ document.getElementById("go-props").onclick = () => { show("props-mlb"); loadPro
 document.getElementById("pmBack").onclick = () => show("board");
 document.getElementById("fdHome").onclick = () => show("home");
 document.getElementById("fd-go").onclick = tryUnlock;
+document.getElementById("reg-go").onclick = submitRegistration;
 document.getElementById("pm-lock-cta").onclick = () => show("founders");
 ["k","hits","hr"].forEach(m => {
   document.getElementById("pm-" + m).onclick = () => setPMMode(m);
@@ -1187,6 +1206,28 @@ async function sha256(s){
   const b = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s.trim().toLowerCase()));
   return Array.from(new Uint8Array(b)).map(x => x.toString(16).padStart(2, "0")).join("");
 }
+const REG_FORM = "https://docs.google.com/forms/d/e/1FAIpQLSfegAxiyyh1jOqO92ISAoLS6B_fLGV4-td0Gw0txSLVDA1ikg/formResponse";
+const REG_ENTRIES = {name: "entry.623693289", email: "entry.161911747", code: "entry.1097063913"};
+function regDone(){ return localStorage.getItem("slate-registered") === "1"; }
+async function submitRegistration(){
+  const name = document.getElementById("reg-name").value.trim();
+  const email = document.getElementById("reg-email").value.trim();
+  const msg = document.getElementById("reg-msg");
+  if (!name || !email) { msg.textContent = "Name and email both help \u2014 fill in both."; return; }
+  const body = new URLSearchParams();
+  body.set(REG_ENTRIES.name, name);
+  body.set(REG_ENTRIES.email, email);
+  body.set(REG_ENTRIES.code, localStorage.getItem("slate-founder-code") || "(unknown pass)");
+  try {
+    await fetch(REG_FORM, {method: "POST", mode: "no-cors",
+      headers: {"Content-Type": "application/x-www-form-urlencoded"}, body});
+    localStorage.setItem("slate-registered", "1");
+    msg.textContent = "Registered \u2014 thank you!";
+    setTimeout(syncFounderUI, 900);
+  } catch (e) {
+    msg.textContent = "Couldn\u2019t reach the registry \u2014 try again in a moment.";
+  }
+}
 async function tryUnlock(){
   const code = document.getElementById("fd-code").value;
   const msg = document.getElementById("fd-msg");
@@ -1199,8 +1240,10 @@ async function tryUnlock(){
       return;
     }
     localStorage.setItem("slate-founder-until", key.until);
+    localStorage.setItem("slate-founder-code", code.trim().toLowerCase());
     IS_FOUNDER = true;
-    msg.textContent = "Welcome, founder \u2014 active through " + key.until + ".";
+    msg.textContent = "Welcome, founder \u2014 active through " + key.until
+      + ". Register your pass below so renewals reach you.";
     syncFounderUI();
   } else {
     msg.textContent = "That code didn't match \u2014 check for typos.";
@@ -1211,6 +1254,13 @@ function syncFounderUI(){
   const st = document.getElementById("fd-state");
   if (st) st.textContent = IS_FOUNDER
     ? "\u2713 Founder \u00b7 thru " + founderUntil() : "";
+  const reg = document.getElementById("fd-register");
+  if (reg) {
+    reg.classList.toggle("hide", !(IS_FOUNDER && !regDone()));
+    const show = document.getElementById("reg-code-show");
+    if (show) show.textContent = "Pass: "
+      + (localStorage.getItem("slate-founder-code") || "\u2014");
+  }
   const lockNote = document.getElementById("pm-lock-note");
   if (lockNote) {
     const u = founderUntil();
