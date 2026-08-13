@@ -1186,6 +1186,7 @@ async function loadProps(){
    Codes live only as SHA-256 hashes; each friend gets their own so one
    can be revoked without resetting everyone. Client-side = honor lock,
    good enough for a friends beta, not for strangers. */
+const ADMIN_HASHES = ["f1f3ea23e934fb6c2bedabda058b9214c7bb946184541f1da49c8dfae38717d8"];
 const FOUNDER_KEYS = [
   {h: "5a2c82ebba9880ee86d1abb26ba21502cb9700153b5a146ad976338140422c4c", until: "2026-10-13"},
   {h: "3e3d67d4fea0d572ef641175fb21c1972aab960151a697c7f3283723a7103f4b", until: "2026-10-13"},
@@ -1233,6 +1234,15 @@ async function tryUnlock(){
   const msg = document.getElementById("fd-msg");
   if (!code) { msg.textContent = "Enter the code you were sent."; return; }
   const h = await sha256(code);
+  if (ADMIN_HASHES.includes(h)) {
+    localStorage.setItem("slate-founder-until", "2099-12-31");
+    localStorage.setItem("slate-admin", "1");
+    localStorage.setItem("slate-registered", "1");
+    IS_FOUNDER = true;
+    msg.textContent = "Admin access \u2014 welcome back, boss.";
+    syncFounderUI();
+    return;
+  }
   const key = FOUNDER_KEYS.find(k => k.h === h);
   if (key) {
     if (key.until < new Date().toISOString().slice(0, 10)) {
@@ -1252,8 +1262,9 @@ async function tryUnlock(){
 function syncFounderUI(){
   IS_FOUNDER = founderActive();
   const st = document.getElementById("fd-state");
-  if (st) st.textContent = IS_FOUNDER
-    ? "\u2713 Founder \u00b7 thru " + founderUntil() : "";
+  if (st) st.textContent = !IS_FOUNDER ? ""
+    : localStorage.getItem("slate-admin") === "1" ? "\u2699 Admin"
+    : "\u2713 Founder \u00b7 thru " + founderUntil();
   const reg = document.getElementById("fd-register");
   if (reg) {
     reg.classList.toggle("hide", !(IS_FOUNDER && !regDone()));
