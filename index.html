@@ -61,6 +61,25 @@
   .yb-band { position:absolute; top:0; bottom:0; background:var(--green); opacity:.45;
     border-radius:4px; }
   .yb-med { position:absolute; top:-2px; bottom:-2px; width:2px; background:var(--green-txt); }
+  .bout-det { padding:10px 0; border-bottom:1px solid var(--line); }
+  .bout-det:last-child { border-bottom:0; }
+  .bout-det > summary { list-style:none; cursor:pointer; }
+  .bout-det > summary::-webkit-details-marker { display:none; }
+  .tape-body { padding:10px 2px 4px; }
+  .tape { border:1px solid var(--line); border-radius:12px; padding:8px 12px; }
+  .tape-row { display:flex; align-items:center; padding:5px 0;
+    border-bottom:1px solid var(--line-2); font-size:13px; }
+  .tape-row:last-child { border-bottom:0; }
+  .tape-a { flex:1; font-weight:700; }
+  .tape-b { flex:1; text-align:right; font-weight:700; }
+  .tape-l { flex:0 0 auto; font-size:9px; letter-spacing:.08em; color:var(--ink-3);
+    font-weight:800; padding:0 10px; }
+  .tape-sec { font-size:10px; letter-spacing:.08em; font-weight:800;
+    color:var(--ink-3); text-transform:uppercase; padding:12px 0 4px; }
+  .fin-who { font-size:12px; font-weight:700; padding:4px 0 2px; }
+  .fin-bar { display:flex; height:8px; border-radius:4px; overflow:hidden;
+    background:var(--card-2); }
+  .fin-leg { font-size:11px; color:var(--ink-3); padding-top:3px; }
   .bout { padding:10px 0; border-bottom:1px solid var(--line); }
   .bout:last-child { border-bottom:0; }
   .bout-live { background:rgba(61,214,160,.05); margin:0 -14px; padding:10px 14px; }
@@ -1694,6 +1713,137 @@ function ufcFighter(c, won){
     + (rec ? '<div class="uf-rec">' + esc(rec) + "</div>" : "")
     + "</div>" + (won ? '<span class="uf-w">W</span>' : "") + "</div>";
 }
+const FIGHTER_CACHE = {};
+function statScan(obj, out, depth){
+  // recursively harvest {name/displayName -> value} stat leaves; shape-proof
+  if (!obj || depth > 7) return out;
+  if (Array.isArray(obj)) { obj.forEach(x => statScan(x, out, depth+1)); return out; }
+  if (typeof obj === "object") {
+    const nm = obj.name || obj.displayName || obj.abbreviation;
+    const val = obj.value != null ? obj.value : obj.displayValue;
+    if (nm && val != null && (typeof val === "number" || typeof val === "string"))
+      out[String(nm).toLowerCase()] = val;
+    for (const k in obj) statScan(obj[k], out, depth+1);
+  }
+  return out;
+}
+function pickStat(stats, keys){
+  for (const k of keys) if (stats[k] != null && stats[k] !== "") return stats[k];
+  return null;
+}
+async function probeFighter(id){
+  if (!id) return null;
+  if (FIGHTER_CACHE[id]) return FIGHTER_CACHE[id];
+  const urls = [
+    "https://site.web.api.espn.com/apis/common/v3/sports/mma/athletes/" + id,
+    "https://site.api.espn.com/apis/site/v2/sports/mma/ufc/athletes/" + id,
+  ];
+  let j = null;
+  for (const u of urls){
+    try { const r = await fetch(u); if (r.ok) { j = await r.json(); break; } } catch(e){}
+  }
+  if (!j) return (FIGHTER_CACHE[id] = { id });
+  const a = j.athlete || j;
+  const stats = statScan(j, {}, 0);
+  const F = {
+    id,
+    name: a.displayName || a.fullName,
+    age: a.age,
+    height: a.displayHeight || pickStat(stats, ["height"]),
+    reach: a.displayReach || a.reach || pickStat(stats, ["reach"]),
+    stance: (a.stance && (a.stance.text || a.stance.name)) || pickStat(stats, ["stance"]),
+    gym: (a.association && (a.association.name || a.association.text)) || null,
+    wclass: (a.weightClass && (a.weightClass.text || a.weightClass.name)) || null,
+    ko: pickStat(stats, ["kowins","knockouts","wins by knockout","tkos","ko/tko"]),
+    sub: pickStat(stats, ["submissionwins","submissions","wins by submission"]),
+    dec: pickStat(stats, ["decisionwins","wins by decision","decisions"]),
+  };
+  // fight history if the payload carries one
+  const evs = [];
+  const dig = (o, depth) => {
+    if (!o || depth > 6) return;
+    if (Array.isArray(o)) { o.forEach(x => dig(x, depth+1)); return; }
+    if (typeof o === "object") {
+      const opp = o.opponent && (o.opponent.displayName || o.opponent.name);
+      if (opp) evs.push({
+        opp,
+        won: o.winner === true || (o.result && /^w/i.test(String(o.result.abbreviation || o.result))),
+        method: (o.result && (o.result.displayName || o.result.description || o.result.shortDisplayName)) || o.method || "",
+        year: o.date ? String(o.date).slice(0,4) : "",
+      });
+      else for (const k in o) dig(o[k], depth+1);
+    }
+  };
+  dig(j, 0);
+  if (evs.length) F.fights = evs.slice(0, 30);
+  return (FIGHTER_CACHE[id] = F);
+}
+function tapeRow(label, va, vb){
+  if (va == null && vb == null) return "";
+  const c = v => v == null ? "\u2014" : esc(String(v));
+  return '<div class="tape-row"><span class="tape-a">' + c(va)
+    + '</span><span class="tape-l">' + label + '</span><span class="tape-b">'
+    + c(vb) + "</span></div>";
+}
+function finishBar(F){
+  const ko = Number(F.ko), sub = Number(F.sub), dec = Number(F.dec);
+  if (![ko,sub,dec].every(Number.isFinite) || (ko+sub+dec) <= 0) return "";
+  const tot = ko + sub + dec;
+  const pct = x => (100*x/tot).toFixed(0);
+  return '<div class="fin"><div class="fin-bar">'
+    + '<span style="width:' + pct(ko) + '%;background:var(--green)"></span>'
+    + '<span style="width:' + pct(sub) + '%;background:#5AA9E6"></span>'
+    + '<span style="width:' + pct(dec) + '%;background:var(--ink-3)"></span></div>'
+    + '<div class="fin-leg">' + ko + ' KO/TKO \u00b7 ' + sub + ' SUB \u00b7 '
+    + dec + ' DEC \u2014 ' + pct(ko + sub) + '% of wins by stoppage</div></div>';
+}
+function renderTape(el, A, B){
+  if (!A && !B){ el.innerHTML = '<p class="bt-match">ESPN didn\u2019t share more on this bout.</p>'; return; }
+  A = A || {}; B = B || {};
+  let h = "";
+  const rows = tapeRow("AGE", A.age, B.age) + tapeRow("HEIGHT", A.height, B.height)
+    + tapeRow("REACH", A.reach, B.reach) + tapeRow("STANCE", A.stance, B.stance)
+    + tapeRow("GYM", A.gym, B.gym);
+  if (rows) h += '<div class="tape">' + rows + "</div>";
+  const fa = finishBar(A), fb = finishBar(B);
+  if (fa || fb) h += '<div class="tape-sec">How they win</div>'
+    + (fa ? '<div class="fin-who">' + esc(A.name || "") + "</div>" + fa : "")
+    + (fb ? '<div class="fin-who">' + esc(B.name || "") + "</div>" + fb : "");
+  const recent = (F) => (F.fights || []).slice(0, 3).map(f =>
+    '<div class="pm-split"><span>' + (f.won ? '<b style="color:var(--green-txt)">W</b>' : "<b>L</b>")
+    + " vs " + esc(f.opp) + "</span><small>" + esc(f.method || "") + "</small></div>").join("");
+  if ((A.fights || []).length || (B.fights || []).length){
+    h += '<div class="tape-sec">Recent fights</div>';
+    if ((A.fights||[]).length) h += '<div class="fin-who">' + esc(A.name||"") + "</div>" + recent(A);
+    if ((B.fights||[]).length) h += '<div class="fin-who">' + esc(B.name||"") + "</div>" + recent(B);
+  }
+  if ((A.fights || []).length && (B.fights || []).length){
+    const norm = s => String(s).toLowerCase().replace(/[^a-z]/g, "");
+    const bmap = {};
+    B.fights.forEach(f => { bmap[norm(f.opp)] = f; });
+    const shared = A.fights.filter(f => bmap[norm(f.opp)]);
+    if (shared.length){
+      h += '<div class="tape-sec">Shared opponents</div>' + shared.map(f => {
+        const g = bmap[norm(f.opp)];
+        return '<div class="pm-split"><span><b>' + esc(f.opp) + "</b></span><small>"
+          + esc((A.name||"A").split(" ").pop()) + ": " + (f.won?"W":"L")
+          + " \u00b7 " + esc((B.name||"B").split(" ").pop()) + ": " + (g.won?"W":"L") + "</small></div>";
+      }).join("");
+    }
+  }
+  h += '<p class="bt-match" style="padding-top:10px">Stats: ESPN. No win probability shown '
+    + '\u2014 the model is still in the lab, and facts beat guesses.</p>';
+  el.innerHTML = h || '<p class="bt-match">ESPN didn\u2019t share more on this bout.</p>';
+}
+async function loadTape(el, idA, idB){
+  el.innerHTML = '<p class="bt-match">Pulling the tape\u2026</p>';
+  try{
+    const [A, B] = await Promise.all([probeFighter(idA), probeFighter(idB)]);
+    renderTape(el, A, B);
+  }catch(e){
+    el.innerHTML = '<p class="bt-match">Couldn\u2019t reach ESPN for fighter stats.</p>';
+  }
+}
 function renderUFC(d){
   const events = d?.events || [];
   const board = document.getElementById("ufc-board");
@@ -1720,17 +1870,27 @@ function renderUFC(d){
             || (bt.notes && bt.notes[0] && bt.notes[0].headline) || "";
           const stTxt = live ? (st.shortDetail || "LIVE")
             : done ? (st.shortDetail || "Final") : "";
-          return '<div class="bout' + (live ? " bout-live" : "") + '">'
+          const idA = c1?.athlete?.id, idB = c2?.athlete?.id;
+          return '<details class="bout-det' + (live ? " bout-live" : "") + '" data-a="'
+            + (idA || "") + '" data-b="' + (idB || "") + '"><summary>'
             + '<div class="bout-head"><span>' + esc(cls) + "</span><span"
             + (live ? ' style="color:var(--green-txt);font-weight:800"' : "")
             + ">" + esc(stTxt) + "</span></div>"
             + ufcFighter(c1, done && c1?.winner)
-            + '<div class="bout-vs">vs</div>'
+            + '<div class="bout-vs">vs \u00b7 tap for the tape</div>'
             + ufcFighter(c2, done && c2?.winner)
-            + "</div>";
+            + "</summary><div class=\"tape-body\"></div></details>";
         }).join("")
       + "</article>";
   }).join("");
+  board.querySelectorAll(".bout-det").forEach(d => {
+    d.addEventListener("toggle", () => {
+      if (d.open && !d.dataset.hit){
+        d.dataset.hit = "1";
+        loadTape(d.querySelector(".tape-body"), d.dataset.a, d.dataset.b);
+      }
+    });
+  });
 }
 function renderNFLProps(d){
   const board = document.getElementById("nflp-board");
@@ -2655,44 +2815,65 @@ function renderBT(w, fit) {
     + '<span>pred '+pc(x.pred)+' · actual <b style="color:var(--truth)">'+pc(x.act)+'</b></span></div>'
   ).join("");
 
+  const acc = Math.round(100*e.acc);
+  const homeWin = Math.round(100*(1-b.homeRate));
   out.innerHTML =
-    '<div class="block"><h3>Result · '+e.n+' games'
-      + (BT.skipped ? ' · '+BT.skipped+' skipped' : '') + '</p>'
-    + '<dl class="readout">'
-    + '<div class="cell"><dt>Brier</dt><dd class="v-truth">'+f4(e.brier)+'</dd></div>'
-    + '<div class="cell"><dt>Skill vs coin flip</dt><dd class="'
-      +(e.skill>0?"v-truth":"v-vig")+'">'+(e.skill>=0?"+":"")+pc(e.skill)+'</dd></div>'
-    + '<div class="cell"><dt>Log loss</dt><dd>'+f4(e.ll)+'</dd></div>'
-    + '</dl>'
-    + '<div style="margin-top:16px">'
-      + '<div class="stat-row"><span>Accuracy (picked the winner)</span><span>'+pc(e.acc)+'</span></div>'
-      + '<div class="stat-row"><span>Home teams actually won</span><span>'+pc(1-b.homeRate)+'</span></div>'
-      + '<div class="stat-row"><span>Baseline · always 50%</span><span>'+f4(b.flat)+'</span></div>'
-      + '<div class="stat-row"><span>Baseline · always home</span><span>'+f4(b.home)+'</span></div>'
-      + '<div class="stat-row"><span>Baseline · team record only</span><span>'+f4(b.teamOnly)+'</span></div>'
-    + '</div></div>'
+    '<article class="game"><div class="g-head"><span class="g-when">Does the model actually work?</span>'
+      + '<span class="g-venue">' + e.n + ' games replayed'
+      + (BT.skipped ? ' \u00b7 ' + BT.skipped + ' skipped' : '') + '</span></div>'
+    + '<p class="bt-match" style="padding-top:4px">We replayed every game in your window using '
+    + 'only what was knowable each morning \u2014 standings, pitching form, nothing from the '
+    + 'future. The model picked the winner:</p>'
+    + '<div style="font-size:44px;font-weight:900;color:var(--green-txt);padding:6px 0 2px">'
+    + acc + '%<span style="font-size:14px;color:var(--ink-3);font-weight:600"> of the time</span></div>'
+    + scaleBar([
+        {label:"Coin flip", v:50},
+        {label:"Always pick home", v:homeWin},
+        {label:"SLATE", v:acc, hot:true},
+      ], 44, Math.max(acc, homeWin) + 6)
+    + '<p class="bt-match" style="padding-top:14px">Baseball is the hardest sport to call \u2014 '
+    + 'the best teams lose 60 times a year, and even Vegas favorites only win about 57% of '
+    + 'the time. Beating "always pick home" at all is the bar that matters here. The live '
+    + 'version is also graded against sportsbook closing lines every day on the record.</p>'
+    + '<details class="d"><summary>Show the full numbers</summary>'
+      + '<div class="stat-row"><span>Sharpness (log loss \u2014 lower is better; coin flip = 0.693)</span><span>' + f4(e.ll) + '</span></div>'
+      + '<div class="stat-row"><span>Brier score (same idea, different math)</span><span>' + f4(e.brier) + '</span></div>'
+      + '<div class="stat-row"><span>Skill vs coin flip</span><span>' + (e.skill>=0?"+":"") + pc(e.skill) + '</span></div>'
+      + '<div class="stat-row"><span>Guessing 50/50 every game would score</span><span>' + f4(b.flat) + '</span></div>'
+      + '<div class="stat-row"><span>Always picking home would score</span><span>' + f4(b.home) + '</span></div>'
+      + '<div class="stat-row"><span>Using team records only would score</span><span>' + f4(b.teamOnly) + '</span></div>'
+    + '</details></article>'
 
-    + '<div class="block"><h3>Calibration</p>'
-    + (cal || '<p style="color:var(--dim);font-size:13px">Not enough spread to bucket.</p>')
-    + '<p style="font-size:12px;color:var(--dim);margin:12px 0 0;line-height:1.5">'
-    + 'Predicted and actual should track each other. Actual consistently below predicted means '
-    + 'the model is overconfident and the weights are too aggressive.</p></div>'
+    + '<article class="game"><div class="g-head"><span class="g-when">When it says 60%, can you believe the 60?</span></div>'
+    + '<p class="bt-match" style="padding-top:4px">The honesty check: group every prediction by '
+    + 'the confidence it claimed, then see how often those teams actually won.</p>'
+    + (e.bins.filter(x => x.n > 0).map(x =>
+        '<div class="pm-split"><span>Model said about <b>' + Math.round(100*x.pred) + '%</b>'
+        + '<small> \u00b7 ' + x.n + ' games</small></span><b>won ' + Math.round(100*x.act) + '%</b></div>'
+      ).join("") || '<p class="bt-match">Not enough games in this window to bucket \u2014 widen the dates.</p>')
+    + '<p class="bt-match" style="padding-top:8px">Said and happened should track each other. '
+    + 'If "happened" runs consistently below "said," the model is overconfident \u2014 that\u2019s '
+    + 'exactly what this page exists to catch.</p></article>'
 
-    + (fit ? '<div class="block"><h3>Fitted weights</p>'
-        + '<div class="stat-row"><span>Train log loss (n='+fit.nTrain+')</span><span>'+f4(fit.train.ll)+'</span></div>'
-        + '<div class="stat-row"><span>Test log loss (n='+fit.nTest+')</span><span class="'
-          +(fit.test.ll < fit.testBase.ll ? "pos":"neg")+'">'+f4(fit.test.ll)+'</span></div>'
-        + '<div class="stat-row"><span>Test log loss · current weights</span><span>'+f4(fit.testBase.ll)+'</span></div>'
-        + '<div style="font-family:var(--mono);font-size:11px;color:var(--dim);margin-top:12px;line-height:1.7">'
-        + 'TEAM_REGRESS  '+w.TEAM_REGRESS+'<br>SP_PRIOR_IP   '+w.SP_PRIOR_IP
-        + '<br>SP_L5_WEIGHT  '+w.SP_L5_WEIGHT+'<br>RUNS_TO_LOGIT '+w.RUNS_TO_LOGIT+'</div>'
-        + '<p style="font-size:12px;color:var(--dim);margin:12px 0 0;line-height:1.5">'
+    + (fit ? '<article class="game"><div class="g-head"><span class="g-when">The re-tune experiment</span></div>'
+        + '<p class="bt-match" style="padding-top:4px">We let the model re-tune its dials on the '
+        + 'first 70% of these games (' + fit.nTrain + '), then tested the new settings on the '
+        + 'last 30% (' + fit.nTest + ') \u2014 games the tuning never saw.</p>'
+        + '<div class="stat-row"><span>New settings on unseen games</span><span class="'
+          + (fit.test.ll < fit.testBase.ll ? "pos":"neg") + '">' + f4(fit.test.ll) + '</span></div>'
+        + '<div class="stat-row"><span>Current settings on the same games</span><span>' + f4(fit.testBase.ll) + '</span></div>'
+        + '<p class="bt-match" style="padding-top:8px">'
         + (fit.test.ll < fit.testBase.ll
-            ? 'These beat the current weights on data they were not fitted to. Worth adopting if the gap holds on a second window.'
-            : 'These did <b>not</b> beat the current weights out of sample. That is the fit chasing noise — keep what you have.')
-        + '</p></div>' : '')
+            ? '<b>The new settings won</b> on games they were not fitted to \u2014 worth adopting if the edge holds on a second window.'
+            : '<b>The new settings lost</b> on unseen games. That\u2019s the tuning chasing noise \u2014 we keep what we have. Most re-tunes end this way, and that\u2019s the system working.')
+        + '</p>'
+        + '<details class="d"><summary>The dials it chose</summary>'
+        + '<div style="font-family:var(--mono);font-size:11px;color:var(--dim);line-height:1.7">'
+        + 'TEAM_REGRESS  ' + w.TEAM_REGRESS + '<br>SP_PRIOR_IP   ' + w.SP_PRIOR_IP
+        + '<br>SP_L5_WEIGHT  ' + w.SP_L5_WEIGHT + '<br>RUNS_TO_LOGIT ' + w.RUNS_TO_LOGIT + '</div>'
+        + '</details></article>' : '')
 
-    + '<div class="block"><h3>Adjust and re-score</p><div id="btSliders"></div></div>';
+    + '<div class="block"><h3>Adjust and re-score</h3><div id="btSliders"></div></div>';
 
   const specs = [
     ["TEAM_REGRESS","Team regression",0.5,1.0,0.05],
