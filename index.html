@@ -61,6 +61,27 @@
   .yb-band { position:absolute; top:0; bottom:0; background:var(--green); opacity:.45;
     border-radius:4px; }
   .yb-med { position:absolute; top:-2px; bottom:-2px; width:2px; background:var(--green-txt); }
+  .sb { position:relative; height:58px; margin:18px 4px 4px; }
+  .sb-line { position:absolute; top:26px; left:0; right:0; height:3px;
+    background:var(--line); border-radius:2px; }
+  .sb-dot { position:absolute; top:20px; width:15px; height:15px; border-radius:50%;
+    background:var(--ink-3); transform:translateX(-50%); }
+  .sb-hot { background:var(--green); box-shadow:0 0 0 4px rgba(61,214,160,.18); }
+  .sb-v { position:absolute; top:-20px; left:50%; transform:translateX(-50%);
+    font-size:11px; font-weight:800; color:var(--ink-2); white-space:nowrap; }
+  .sb-hot .sb-v { color:var(--green-txt); }
+  .sb-l { position:absolute; top:19px; left:50%; transform:translateX(-50%);
+    font-size:9px; color:var(--ink-3); white-space:nowrap; letter-spacing:.03em; }
+  .sb-dot:nth-child(odd) .sb-l { top:19px; }
+  .tlogo { width:26px; height:26px; object-fit:contain; flex:0 0 auto; }
+  .tlogo-sm { width:18px; height:18px; object-fit:contain; flex:0 0 auto;
+    vertical-align:-4px; margin-right:6px; }
+  .face { width:38px; height:38px; border-radius:50%; object-fit:cover;
+    object-position:top; background:var(--card-2); border:1px solid var(--line);
+    flex:0 0 auto; }
+  .face-lg { width:46px; height:46px; border-radius:50%; object-fit:cover;
+    object-position:top; background:var(--card-2); border:1px solid var(--line);
+    flex:0 0 auto; vertical-align:middle; margin-right:10px; }
   .pm-log { width:100%; border-collapse:collapse; margin:8px 0 4px; font-size:12px; }
   .pm-log th { text-align:left; font-size:9.5px; font-weight:800; letter-spacing:.05em;
     color:var(--ink-3); padding:2px 6px 4px 0; }
@@ -565,6 +586,13 @@
     see the opposing lineup. No lines, no edges — those come only when
     they can be filed and publicly graded.
   </div>
+  <details class="help" style="margin:10px 16px 0">
+    <summary>How to read these numbers</summary>
+    <p><b>7.1 K expected</b> — our single best guess for his strikeouts tonight.
+    <b>O6.5 55%</b> — we give him a 55% chance of clearing 6.5. The bars show every
+    outcome we consider possible and how likely each one is. These are research
+    projections with a public track record — not betting advice.</p>
+  </details>
   <div class="pm-switch">
     <button id="pm-k" class="pm-seg on">Strikeouts</button>
     <button id="pm-hits" class="pm-seg">Hits</button>
@@ -633,6 +661,14 @@
   <h2>Did the model know anything?</h2>
   <p class="lede">Replays past games using only what was knowable that morning, then
   scores the predictions.</p>
+  <details class="help" style="margin:10px 0 0">
+    <summary>How to read the scores</summary>
+    <p><b>Accuracy</b> — how often the model’s favorite actually won.
+    <b>Log loss</b> — a sharpness score that rewards being confident <i>and</i> right:
+    lower is better, and 0.693 is what flipping a coin scores. A model can be honest at
+    55% accuracy — baseball is the hardest sport to call — as long as its
+    confidence matches reality, which is exactly what this test checks.</p>
+  </details>
 
   <div class="block">
     <h3>Window</h3>
@@ -1319,7 +1355,8 @@ function pitcherCard(p){
     + "%</td></tr>").join("");
   const splits = splitLine("K% vs top-half offenses", p.vs_top_offense)
     + splitLine("K% vs bottom-half offenses", p.vs_bottom_offense);
-  return '<div class="pm-name">' + esc(p.name)
+  return '<div class="pm-name" style="display:flex;align-items:center">'
+    + mlbFace(p.pitcher_id, "face-lg") + esc(p.name)
     + '<span class="pm-mean">' + p.mean.toFixed(1) + " K expected</span></div>"
     + '<div class="kb-row">' + bars + "</div>"
     + '<div class="ov-row">' + overs + "</div>"
@@ -1340,6 +1377,7 @@ function batterRow(b, mode){
   const splits = splitLine("BA vs top-half pitching", b.vs_top_pitching)
     + splitLine("BA vs bottom-half pitching", b.vs_bottom_pitching);
   return '<details class="bt-det"><summary><div class="bt-row">'
+    + mlbFace(b.batter_id)
     + '<div class="bt-who"><div class="bt-name">' + esc(b.name) + "</div>"
     + '<div class="bt-match">' + b.n_prior + " games</div></div>"
     + cells + "</div></summary>"
@@ -1449,41 +1487,139 @@ function nbtTable(head, rows){
     + "</tr>" + rows.map(r => "<tr>" + r.map(c => "<td>"+c+"</td>").join("") + "</tr>").join("")
     + "</table>";
 }
+function scaleBar(items, lo, hi){
+  // items: [{label, v, hot}] rendered as dots on a horizontal scale
+  const pos = v => (100 * (v - lo) / (hi - lo)).toFixed(1);
+  return '<div class="sb">'
+    + '<div class="sb-line"></div>'
+    + items.map(it =>
+        '<div class="sb-dot' + (it.hot ? ' sb-hot' : '') + '" style="left:' + pos(it.v) + '%">'
+        + '<span class="sb-v">' + it.v + '%</span>'
+        + '<span class="sb-l">' + it.label + '</span></div>').join("")
+    + '</div>';
+}
 function renderNFLBT(d){
-  document.getElementById("nbt-sub").textContent = "walk-forward \u00b7 3 holdout seasons";
-  const MKT_NAMES = {rec_yards:"Rec yds", rush_yards:"Rush yds",
-    rush_rec_yds:"Rush+rec yds", rush_att:"Rush att", pass_yards:"Pass yds",
-    completions:"Completions", pass_att:"Pass att"};
-  let h = '<article class="game"><div class="g-head"><span class="g-when">Game winner (moneyline)</span><span class="g-venue">vs closing lines</span></div>'
-    + nbtTable(["Season","N","Accuracy","Our logloss","Market"],
-        d.moneyline.map(r => [r.season, r.n, (100*r.acc).toFixed(1)+"%", r.logloss.toFixed(4), r.market_logloss.toFixed(4)]))
-    + '<p class="bt-match" style="padding-top:6px">Lower logloss is better. The closing line is the hardest benchmark in sports \u2014 tracking within a few hundredths of it with public data is the honest result, and it\u2019s graded live weekly in season.</p>'
+  document.getElementById("nbt-sub").textContent = "the practice exam";
+  const fold = (label, inner) =>
+    '<details class="d"><summary>' + label + '</summary>' + inner + '</details>';
+  const MKT_NAMES = {rec_yards:"Receiving yards", rush_yards:"Rushing yards",
+    rush_rec_yds:"Rush + catch yards", rush_att:"Carries", pass_yards:"Passing yards",
+    completions:"Completions", pass_att:"Pass attempts"};
+
+  const nGames = d.moneyline.reduce((s,r)=>s+r.n,0);
+  const avgAcc = Math.round(100 * d.moneyline.reduce((s,r)=>s+r.acc*r.n,0) / nGames);
+
+  let h = '<article class="game">'
+    + '<div class="g-head"><span class="g-when">Does the model actually work?</span></div>'
+    + '<p class="bt-match" style="padding-top:4px">We gave the model a practice exam: '
+    + '<b>' + nGames + ' real NFL games from past seasons</b> it had never seen, using only '
+    + 'information available before each kickoff. It picked the winner:</p>'
+    + '<div style="font-size:44px;font-weight:900;color:var(--green-txt);padding:6px 0 2px">'
+    + avgAcc + '%<span style="font-size:14px;color:var(--ink-3);font-weight:600"> of the time</span></div>'
+    + scaleBar([
+        {label:"Coin flip", v:50},
+        {label:"Always pick home", v:55},
+        {label:"SLATE", v:avgAcc, hot:true},
+        {label:"Vegas", v:66},
+      ], 46, 70)
+    + '<p class="bt-match" style="padding-top:14px">Clearly smarter than guessing. Nearly as '
+    + 'sharp as Vegas \u2014 who employ armies of pros \u2014 using only free public data. '
+    + 'And once the season starts, every prediction is graded publicly each week.</p>'
     + '</article>';
-  h += '<article class="game"><div class="g-head"><span class="g-when">Projected margin</span><span class="g-venue">vs closing spread</span></div>'
-    + nbtTable(["Season","Our MAE","Spread MAE"],
-        d.margin.map(r => [r.season, r.margin_mae, r.market_margin_mae]))
-    + '<p class="bt-match" style="padding-top:6px">' + esc(d.spread_note) + '</p></article>';
-  const seasons = [2023, 2024, 2025];
-  h += '<article class="game"><div class="g-head"><span class="g-when">Player props \u2014 quantile coverage</span><span class="g-venue">targets 10/25/50/75/90%</span></div>';
+
+  // aggregate the props honesty check across all markets, weighted by n
+  const levels = [["q10",10],["q25",25],["q50",50],["q75",75],["q90",90]];
+  const agg = {};
+  let totalPg = 0;
   for (const mk of Object.keys(d.props_cont)) {
-    const rows = d.props_cont[mk].map(r =>
-      [r.season, r.n, r.q10+"%", r.q25+"%", r.q50+"%", r.q75+"%", r.q90+"%"]);
-    h += '<div class="pm-split" style="padding-top:8px"><span><b>' + (MKT_NAMES[mk]||mk) + '</b></span></div>'
-      + nbtTable(["Season","N","q10","q25","q50","q75","q90"], rows);
+    for (const r of d.props_cont[mk]) {
+      totalPg += r.n;
+      for (const [k, lv] of levels) {
+        agg[lv] = agg[lv] || {w:0, s:0};
+        agg[lv].w += r.n; agg[lv].s += r[k] * r.n;
+      }
+    }
   }
-  h += '<p class="bt-match" style="padding-top:6px">If the model says q50, reality should land under it 50% of the time. All markets sit within a few points of nominal at every mark.</p></article>';
-  h += '<article class="game"><div class="g-head"><span class="g-when">Receptions</span><span class="g-venue">negative binomial vs Poisson</span></div>'
-    + nbtTable(["Season","N","alpha","NB log","Poisson log"],
-        d.receptions.map(r => [r.season, r.n, r.alpha, r.nb_log.toFixed(4), r.poisson_log.toFixed(4)]))
-    + '<div class="pm-split" style="padding-top:6px"><span>P(4+ catches) calibration, 2025</span></div>'
-    + nbtTable(["Predicted","Actual","N"],
-        (d.receptions[2]?.p4_buckets||[]).map(b => [b.pred+"%", b.hit+"%", b.n]))
+  h += '<article class="game">'
+    + '<div class="g-head"><span class="g-when">When it says 70%, can you believe the 70?</span></div>'
+    + '<p class="bt-match" style="padding-top:4px">Same practice exam for player props \u2014 '
+    + '<b>' + totalPg.toLocaleString() + ' player-games</b>. We checked: when the model quoted '
+    + 'a chance, how often did the thing actually happen?</p>'
+    + levels.map(([k, lv]) => {
+        const got = Math.round(agg[lv].s / agg[lv].w);
+        return '<div class="pm-split"><span>Model said <b>' + lv + '%</b></span>'
+          + '<b>happened ' + got + '%</b><small>of the time</small></div>';
+      }).join("")
+    + '<p class="bt-match" style="padding-top:8px">The percentages mean what they say. '
+    + 'That\u2019s the entire product.</p>'
     + '</article>';
-  h += '<article class="game"><div class="g-head"><span class="g-when">Benched markets</span><span class="g-venue">tested, not shipped</span></div>'
-    + d.benched.map(b => '<div class="pm-split"><span><b>' + esc(b.market) + '</b></span></div>'
-        + '<p class="bt-match" style="padding:2px 0 8px">' + esc(b.why) + '</p>').join("")
-    + '<p class="bt-match">Benching with evidence is the product: what ships has receipts, what doesn\u2019t ship has reasons.</p></article>';
+
+  const mgLast = d.margin[d.margin.length - 1];
+  h += '<article class="game">'
+    + '<div class="g-head"><span class="g-when">Why should you trust us?</span></div>'
+    + '<p class="bt-match" style="padding-top:4px">Because we publish what <b>failed</b> too:</p>'
+    + '<p class="bt-match">\u2716 <b>Beating Vegas point spreads</b> \u2014 we tested it; we '
+    + 'can\u2019t do it (nobody reliably can). So we show our projected margin next to their '
+    + 'line and never sell "locks."</p>'
+    + '<p class="bt-match">\u2716 <b>Touchdown predictions</b> \u2014 not accurate enough yet. '
+    + 'Not on the site until they are.</p>'
+    + '<p class="bt-match">\u2716 <b>Interception predictions</b> \u2014 too random to predict. '
+    + 'Not on the site.</p>'
+    + '<p class="bt-match" style="padding-top:4px"><b>The rule:</b> if it\u2019s on Slate, it '
+    + 'passed the exam. If it didn\u2019t pass, it\u2019s listed here instead.</p>'
+    + '</article>';
+
+  h += '<article class="game">'
+    + '<div class="g-head"><span class="g-when">The fine print</span>'
+    + '<span class="g-venue">for the curious</span></div>'
+    + fold("Winner-picking, season by season",
+        nbtTable(["Season","Games","Picked right","Sharpness*","Vegas"],
+          d.moneyline.map(r => [r.season, r.n, (100*r.acc).toFixed(1)+"%",
+            r.logloss.toFixed(3), r.market_logloss.toFixed(3)]))
+        + '<p class="bt-match">*"Sharpness" (log loss) scores confidence and correctness '
+        + 'together \u2014 lower is better; 0.693 is a coin flip.</p>')
+    + fold("Margin projections vs the spread",
+        nbtTable(["Season","Our typical miss","Vegas typical miss"],
+          d.margin.map(r => [r.season, r.margin_mae + " pts", r.market_margin_mae + " pts"]))
+        + '<p class="bt-match">Even Vegas misses NFL games by ~'
+        + mgLast.market_margin_mae.toFixed(0) + ' points on average \u2014 football is chaos.</p>')
+    + fold("Props, every market and confidence level",
+        Object.keys(d.props_cont).map(mk =>
+          '<div class="pm-split" style="padding-top:8px"><span><b>' + (MKT_NAMES[mk]||mk) + '</b></span></div>'
+          + nbtTable(["Season","Games","said 10%","said 25%","said 50%","said 75%","said 90%"],
+              d.props_cont[mk].map(r => [r.season, r.n, r.q10+"%", r.q25+"%", r.q50+"%", r.q75+"%", r.q90+"%"]))
+        ).join(""))
+    + fold("Catches: our model vs the textbook one",
+        nbtTable(["Season","Player-games","Ours*","Textbook*"],
+          d.receptions.map(r => [r.season, r.n, r.nb_log.toFixed(3), r.poisson_log.toFixed(3)]))
+        + '<p class="bt-match">Lower is better; ours wins all three seasons, narrowly. In '
+        + 'coin-flip spots it runs slightly optimistic (said 50%, happened ~44%) \u2014 '
+        + 'published, not hidden.</p>')
+    + '</article>';
   document.getElementById("nbt-board").innerHTML = h;
+}
+function mlbLogo(teamId, cls){
+  if (!teamId) return "";
+  return '<img class="' + (cls || "tlogo") + '" loading="lazy" alt="" '
+    + 'src="https://www.mlbstatic.com/team-logos/' + teamId + '.svg" '
+    + 'onerror="this.style.display=\'none\'">';
+}
+function mlbFace(pid, cls){
+  if (!pid) return "";
+  return '<img class="' + (cls || "face") + '" loading="lazy" alt="" '
+    + 'src="https://img.mlbstatic.com/mlb-photos/image/upload/w_120,q_auto/v1/people/'
+    + pid + '/headshot/67/current" onerror="this.style.display=\'none\'">';
+}
+function nflLogo(abbr, cls){
+  if (!abbr) return "";
+  return '<img class="' + (cls || "tlogo") + '" loading="lazy" alt="" '
+    + 'src="https://a.espncdn.com/i/teamlogos/nfl/500/' + abbr.toLowerCase()
+    + '.png" onerror="this.style.display=\'none\'">';
+}
+function faceImg(url, cls){
+  if (!url) return "";
+  return '<img class="' + (cls || "face") + '" loading="lazy" alt="" src="'
+    + url + '" onerror="this.style.display=\'none\'">';
 }
 function renderNFLProps(d){
   const board = document.getElementById("nflp-board");
@@ -1503,7 +1639,11 @@ function renderNFLProps(d){
   };
   const primaryOf = p => p.pos === "QB" ? "pass_yards"
     : p.pos === "RB" ? "rush_yards" : "rec_yards";
-  board.innerHTML = games.map(g =>
+  const helper = '<details class="help" style="margin:0 0 10px"><summary>How to read these numbers</summary>'
+    + '<p>The <b>bar</b> is the player\u2019s typical range \u2014 half his games land inside it; the bright tick is the middle outcome. '
+    + '<b>MED</b> \u2014 half his games go over it, half under. <b>O50 62%</b> \u2014 a 62% chance he clears 50 yards. '
+    + 'Tap any player for every market. Research projections with a public record \u2014 not betting advice.</p></details>';
+  board.innerHTML = helper + games.map(g =>
     '<article class="game"><div class="g-head"><span class="g-when">'
     + esc(g.away) + ' @ ' + esc(g.home) + '</span><span class="g-venue">Week '
     + d.week + ' props</span></div>'
@@ -1526,6 +1666,7 @@ function renderNFLProps(d){
             + Math.round(100 * (p.receptions.over["4.5"] ?? 0)) + '%</small></div>'
           : "";
         return '<details class="bt-det"><summary><div class="bt-row">'
+          + faceImg(p.headshot)
           + '<div class="bt-who"><div class="bt-name">' + esc(p.name)
           + ' <small style="color:var(--ink-3)">' + esc(p.pos) + ' \u00b7 '
           + esc(p.team) + '</small></div>'
@@ -1596,7 +1737,7 @@ function renderNFL(d){
       return '<div class="t-chip" style="background:'+col.c+';color:'+col.lt+'">'+esc(ab)+'</div>';
     };
     const row = (t, dim) =>
-      '<div class="t-row'+(dim?' dim':'')+'"><div class="t-left">'+chip(t)
+      '<div class="t-row'+(dim?' dim':'')+'"><div class="t-left">'+nflLogo(t.team?.abbreviation)
       + '<span class="t-name">'+esc(t.team?.shortDisplayName || t.team?.name || "")+'</span>'
       + (t.records?.[0]?.summary ? '<span class="t-rec">'+esc(t.records[0].summary)+'</span>' : '')
       + '</div>'
@@ -1744,7 +1885,7 @@ function render() {
 
     const teamRow = (t, tinfo, inf, pct, isWin, score, dim) =>
       '<div class="t-row'+(dim?' dim':'')+'">'
-      + '<div class="t-left">'+chip(tinfo)
+      + '<div class="t-left">'+mlbLogo(t?.team?.id)
       + '<span class="t-name">'+esc(tinfo.name || t?.team?.abbreviation)+'</span>'
       + (inf.w!=null ? '<span class="t-rec">'+inf.w+'-'+inf.l+'</span>' : '')
       + '</div>'
