@@ -2,7 +2,7 @@
    Shell is cached so the app opens instantly and survives a dead connection.
    Live MLB data is never cached — stale standings are worse than no standings. */
 
-const CACHE = "slate-v44";
+const CACHE = "slate-v45";
 const SHELL = [
   "./",
   "./index.html",
