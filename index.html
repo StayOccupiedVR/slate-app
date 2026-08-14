@@ -15,7 +15,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;500;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg:#0B1420; --bar:#0E1A2B; --card:#12233C; --card-2:#0F1E33;
+    --bg:#0B1420; --bar:#0E1A2B; --card:#12233C; --card-2:#0F1E33; --navy:#0B1420;
     --line:#1B3A5C; --line-2:#12283F;
     --ink:#FFFFFF; --ink-2:#9FB4CE; --ink-3:#5E7A9A;
     --green:#1D9E75; --green-txt:#3DD6A0; --amber:#E0A32E; --red:#E24B4A;
@@ -111,7 +111,7 @@
     opacity:0; pointer-events:none; transition:opacity .18s; }
   #scrim.open { opacity:1; pointer-events:auto; }
   #drawer { position:fixed; top:0; left:0; bottom:0; width:248px; z-index:62;
-    background:linear-gradient(180deg, var(--card) 0%, var(--navy) 140%);
+    background:var(--card); box-shadow:8px 0 24px rgba(0,0,0,.5);
     border-right:1px solid var(--line);
     transform:translateX(-100%); transition:transform .18s ease-out;
     padding:20px 14px 14px; display:flex; flex-direction:column; gap:3px; }
