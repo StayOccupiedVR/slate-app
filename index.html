@@ -1809,7 +1809,7 @@ function renderTape(el, A, B){
   if (fa || fb) h += '<div class="tape-sec">How they win</div>'
     + (fa ? '<div class="fin-who">' + esc(A.name || "") + "</div>" + fa : "")
     + (fb ? '<div class="fin-who">' + esc(B.name || "") + "</div>" + fb : "");
-  const recent = (F) => (F.fights || []).slice(0, 3).map(f =>
+  const recent = (F) => (F.fights || []).slice(0, 7).map(f =>
     '<div class="pm-split"><span>' + (f.won ? '<b style="color:var(--green-txt)">W</b>' : "<b>L</b>")
     + " vs " + esc(f.opp) + "</span><small>" + esc(f.method || "") + "</small></div>").join("");
   if ((A.fights || []).length || (B.fights || []).length){
